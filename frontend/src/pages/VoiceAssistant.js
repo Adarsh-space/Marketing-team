@@ -294,6 +294,17 @@ const VoiceAssistant = () => {
       <div className="fixed bottom-0 left-0 right-0 z-50">
         <div className="max-w-4xl mx-auto px-6 pb-8">
           <Card className="backdrop-blur-2xl bg-black/40 border-white/20 p-8 shadow-2xl">
+            {/* Welcome Message (only when no messages) */}
+            {messages.length === 0 && (
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center mx-auto mb-4 animate-pulse">
+                  <Mic className="w-8 h-8 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Welcome to Voice Assistant</h3>
+                <p className="text-slate-300">Select your language above and click the microphone to start</p>
+              </div>
+            )}
+            
             {/* Status */}
             <div className="text-center mb-6">
               <p className="text-2xl font-semibold text-white mb-2">
