@@ -363,6 +363,84 @@ async def get_dashboard():
         logger.error(f"Error fetching dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Voice Endpoints ====================
+
+@api_router.post("/voice/speech-to-text")
+async def speech_to_text(
+    audio: UploadFile = File(...),
+    language: Optional[str] = Form(None)
+):
+    """
+    Convert speech to text using OpenAI Whisper.
+    Supports multiple languages with auto-detection.
+    """
+    try:
+        # Read audio file
+        audio_data = await audio.read()
+        audio_file = io.BytesIO(audio_data)
+        audio_file.name = audio.filename or "audio.webm"
+        
+        # Transcribe
+        transcript = await voice_service.speech_to_text(
+            audio_file=audio_file,
+            language=language
+        )
+        
+        return {
+            "transcript": transcript,
+            "language": language or "auto-detected"
+        }
+        
+    except Exception as e:
+        logger.error(f"Speech-to-text error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/voice/text-to-speech")
+async def text_to_speech(
+    data: Dict[str, Any]
+):
+    """
+    Convert text to speech using OpenAI TTS.
+    Automatically detects language from text.
+    """
+    try:
+        text = data.get("text")
+        voice = data.get("voice", "nova")
+        speed = data.get("speed", 1.0)
+        
+        if not text:
+            raise HTTPException(status_code=400, detail="Text is required")
+        
+        # Generate speech
+        audio_data = await voice_service.text_to_speech(
+            text=text,
+            voice=voice,
+            speed=speed
+        )
+        
+        # Return audio as streaming response
+        return StreamingResponse(
+            io.BytesIO(audio_data),
+            media_type="audio/mpeg",
+            headers={
+                "Content-Disposition": "attachment; filename=speech.mp3"
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Text-to-speech error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/voice/languages")
+async def get_supported_languages():
+    """
+    Get list of supported languages for voice interaction.
+    """
+    return {
+        "languages": voice_service.SUPPORTED_LANGUAGES,
+        "voices": voice_service.AVAILABLE_VOICES
+    }
+
 # ==================== Health Check ====================
 
 @api_router.get("/health")
