@@ -255,17 +255,6 @@ const VoiceAssistant = () => {
         <div className="max-w-4xl mx-auto">
           {/* Messages */}
           <div className="space-y-6 mb-8">
-            {messages.length === 0 && (
-              <div className="text-center py-20">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center mx-auto mb-6 animate-pulse">
-                  <Mic className="w-12 h-12 text-white" />
-                </div>
-                <h2 className="text-3xl font-bold text-white mb-3">Start a Conversation</h2>
-                <p className="text-lg text-slate-300 mb-2">Click the microphone to begin</p>
-                <p className="text-sm text-slate-400">Powered by Browser Speech Recognition</p>
-              </div>
-            )}
-            
             {messages.map((msg, idx) => (
               <Card 
                 key={idx}
