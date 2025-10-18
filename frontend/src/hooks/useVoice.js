@@ -94,60 +94,49 @@ export const useVoice = (onTranscript, language = 'en') => {
   const startListening = useCallback(async () => {
     try {
       setError(null);
-      audioChunksRef.current = [];
-
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
       
-      streamRef.current = stream;
+      if (!recognitionRef.current) {
+        setError('Speech recognition not initialized');
+        return;
+      }
 
-      // Setup audio context for level monitoring
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      source.connect(analyserRef.current);
+      // Update language
+      recognitionRef.current.lang = language;
 
-      // Setup media recorder
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm'
-        : 'audio/mp4';
-      
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+      // Get microphone for audio visualization
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          } 
+        });
         
-        // Send to backend for transcription
-        await transcribeAudio(audioBlob);
-        
-        // Cleanup
-        audioChunksRef.current = [];
-      };
+        streamRef.current = stream;
 
-      mediaRecorderRef.current.start();
+        // Setup audio context for level monitoring
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        analyserRef.current = audioContextRef.current.createAnalyser();
+        analyserRef.current.fftSize = 256;
+        source.connect(analyserRef.current);
+
+        // Start monitoring audio level
+        monitorAudioLevel();
+      } catch (err) {
+        console.warn('Microphone access for visualization failed:', err);
+      }
+
+      // Start speech recognition
+      recognitionRef.current.start();
       setIsListening(true);
-      
-      // Start monitoring audio level
-      monitorAudioLevel();
 
     } catch (err) {
-      console.error('Microphone error:', err);
-      setError('Failed to access microphone. Please check permissions.');
+      console.error('Speech recognition error:', err);
+      setError('Failed to start speech recognition. Please check browser support.');
     }
-  }, [monitorAudioLevel]);
+  }, [language, monitorAudioLevel]);
 
   // Stop listening
   const stopListening = useCallback(() => {
