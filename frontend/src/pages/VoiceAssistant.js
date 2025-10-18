@@ -170,7 +170,14 @@ const VoiceAssistant = () => {
 
     } catch (error) {
       console.error('Processing error:', error);
-      toast.error('Failed to process audio');
+      
+      // Show specific error message
+      if (error.response?.status === 429) {
+        toast.error('OpenAI API quota exceeded. Please add credits to your OpenAI account or provide a valid API key.');
+      } else {
+        toast.error('Failed to process audio. Please try again.');
+      }
+      
       setMessages(prev => prev.filter(msg => !msg.processing));
     } finally {
       setProcessing(false);
