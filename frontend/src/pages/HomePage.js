@@ -324,24 +324,121 @@ const HomePage = () => {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-testid="chat-modal">
           <Card className="w-full max-w-2xl h-[600px] flex flex-col glass border-white/30 shadow-2xl">
             {/* Chat Header */}
-            <div className="p-6 border-b border-white/20 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+            <div className="p-6 border-b border-white/20">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-800" data-testid="chat-title">AI Marketing Assistant</h3>
+                    <p className="text-sm text-slate-500">Tell me about your marketing goals</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-semibold text-slate-800" data-testid="chat-title">AI Marketing Assistant</h3>
-                  <p className="text-sm text-slate-500">Tell me about your marketing goals</p>
-                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => {
+                    setShowChat(false);
+                    if (voiceEnabled) {
+                      setVoiceEnabled(false);
+                      stopListening();
+                    }
+                  }}
+                  data-testid="close-chat-btn"
+                >
+                  ✕
+                </Button>
               </div>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setShowChat(false)}
-                data-testid="close-chat-btn"
-              >
-                ✕
-              </Button>
+
+              {/* Voice Controls */}
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={voiceEnabled ? "default" : "outline"}
+                    onClick={() => {
+                      setVoiceEnabled(!voiceEnabled);
+                      if (!voiceEnabled) {
+                        toast.success('Voice mode enabled - speak anytime!');
+                      } else {
+                        stopListening();
+                        toast.info('Voice mode disabled');
+                      }
+                    }}
+                    className={voiceEnabled ? "bg-gradient-to-r from-green-500 to-emerald-500 text-white" : "border-slate-200"}
+                    data-testid="toggle-voice-btn"
+                  >
+                    {voiceEnabled ? <Mic className="w-4 h-4 mr-2" /> : <MicOff className="w-4 h-4 mr-2" />}
+                    {voiceEnabled ? 'Voice On' : 'Voice Off'}
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={autoSpeak ? "default" : "outline"}
+                    onClick={() => {
+                      setAutoSpeak(!autoSpeak);
+                      if (!autoSpeak) {
+                        toast.success('Auto-speak enabled');
+                      } else {
+                        stopSpeaking();
+                        toast.info('Auto-speak disabled');
+                      }
+                    }}
+                    className={autoSpeak ? "bg-gradient-to-r from-blue-500 to-indigo-500 text-white" : "border-slate-200"}
+                    data-testid="toggle-speak-btn"
+                  >
+                    {autoSpeak ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
+                    {autoSpeak ? 'Speaker On' : 'Speaker Off'}
+                  </Button>
+                </div>
+
+                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                  <SelectTrigger className="w-36 h-9 border-slate-200" data-testid="language-select">
+                    <SelectValue placeholder="Language" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="en">🇬🇧 English</SelectItem>
+                    <SelectItem value="es">🇪🇸 Spanish</SelectItem>
+                    <SelectItem value="fr">🇫🇷 French</SelectItem>
+                    <SelectItem value="de">🇩🇪 German</SelectItem>
+                    <SelectItem value="it">🇮🇹 Italian</SelectItem>
+                    <SelectItem value="pt">🇵🇹 Portuguese</SelectItem>
+                    <SelectItem value="zh">🇨🇳 Chinese</SelectItem>
+                    <SelectItem value="ja">🇯🇵 Japanese</SelectItem>
+                    <SelectItem value="ar">🇸🇦 Arabic</SelectItem>
+                    <SelectItem value="hi">🇮🇳 Hindi</SelectItem>
+                    <SelectItem value="ru">🇷🇺 Russian</SelectItem>
+                    <SelectItem value="ko">🇰🇷 Korean</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Voice Status Indicator */}
+              {voiceEnabled && (
+                <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`w-2 h-2 rounded-full ${isListening ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                    <span className="text-sm font-medium text-green-700">
+                      {isListening ? 'Listening...' : 'Ready to listen'}
+                    </span>
+                  </div>
+                  {isListening && (
+                    <div className="flex gap-1 items-end h-8">
+                      {[...Array(20)].map((_, i) => (
+                        <div
+                          key={i}
+                          className="flex-1 bg-green-500 rounded-t transition-all duration-75"
+                          style={{
+                            height: `${Math.max(10, (audioLevel / 255) * 100 * (0.5 + Math.random() * 0.5))}%`,
+                            opacity: 0.7
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Messages */}
