@@ -24,22 +24,71 @@ export const useVoice = (onTranscript, language = 'en') => {
     const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
     setAudioLevel(average);
 
-    // Detect silence (threshold: 5)
-    if (average < 5 && isListening) {
-      if (!silenceTimerRef.current) {
-        silenceTimerRef.current = setTimeout(() => {
-          stopListening();
-        }, 2000); // Stop after 2 seconds of silence
-      }
-    } else {
-      if (silenceTimerRef.current) {
-        clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = null;
-      }
+    animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
+  }, []);
+
+  // Initialize speech recognition
+  useEffect(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      setError('Speech recognition not supported in this browser');
+      return;
     }
 
-    animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
-  }, [isListening]);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = language;
+
+    recognitionRef.current.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript;
+      console.log('Voice transcript:', transcript);
+      if (transcript && onTranscript) {
+        onTranscript(transcript);
+      }
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'no-speech') {
+        // Restart listening after no speech
+        if (isListening) {
+          setTimeout(() => {
+            try {
+              recognitionRef.current?.start();
+            } catch (e) {
+              // Already started
+            }
+          }, 1000);
+        }
+      } else {
+        setError(`Speech recognition error: ${event.error}`);
+      }
+    };
+
+    recognitionRef.current.onend = () => {
+      // Auto-restart if still in listening mode
+      if (isListening && recognitionRef.current) {
+        try {
+          recognitionRef.current.start();
+        } catch (e) {
+          console.log('Recognition already started');
+        }
+      }
+    };
+
+    // Initialize speech synthesis
+    synthRef.current = window.speechSynthesis;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+    };
+  }, [language, isListening, onTranscript]);
 
   // Start listening
   const startListening = useCallback(async () => {
