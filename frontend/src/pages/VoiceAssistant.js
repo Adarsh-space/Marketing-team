@@ -35,7 +35,7 @@ const VoiceAssistant = () => {
       recognitionRef.current = new SpeechRecognition();
       recognitionRef.current.continuous = false;
       recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = 'en-US';
+      recognitionRef.current.lang = selectedLanguage;
 
       recognitionRef.current.onresult = async (event) => {
         const transcript = event.results[0][0].transcript;
@@ -53,7 +53,7 @@ const VoiceAssistant = () => {
         setIsListening(false);
         
         if (event.error === 'no-speech') {
-          toast.error('No speech detected. Please try again.');
+          toast.error('No speech detected. Please speak louder and try again.');
         } else if (event.error === 'not-allowed') {
           toast.error('Microphone access denied. Please allow microphone access.');
         } else {
@@ -77,7 +77,7 @@ const VoiceAssistant = () => {
         synthRef.current.cancel();
       }
     };
-  }, []);
+  }, [selectedLanguage]);
 
   // Start listening
   const startListening = () => {
