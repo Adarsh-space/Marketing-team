@@ -98,20 +98,20 @@ const HomePage = () => {
     }
   };
 
-  const handleSendMessage = async () => {
-    if (!message.trim()) return;
+  const handleSendMessage = async (textOverride = null) => {
+    const textToSend = textOverride || message;
+    if (!textToSend.trim()) return;
 
     setLoading(true);
-    const userMessage = message;
     setMessage("");
 
     // Add user message to UI
-    const newUserMessage = { role: "user", content: userMessage };
+    const newUserMessage = { role: "user", content: textToSend };
     setMessages(prev => [...prev, newUserMessage]);
 
     try {
       const response = await axios.post(`${API}/chat`, {
-        message: userMessage,
+        message: textToSend,
         conversation_id: conversationId
       });
 
@@ -126,6 +126,11 @@ const HomePage = () => {
       const assistantMessage = { role: "assistant", content: data.message };
       setMessages(prev => [...prev, assistantMessage]);
 
+      // Speak the response if auto-speak is enabled
+      if (autoSpeak && !isSpeaking) {
+        await speak(data.message);
+      }
+
       // Check if campaign was created
       if (data.ready_to_plan && data.campaign_id) {
         toast.success('Campaign created! Executing plan...');
@@ -134,6 +139,11 @@ const HomePage = () => {
         setTimeout(() => {
           navigate(`/campaign/${data.campaign_id}`);
         }, 1500);
+      }
+
+      // Restart listening if voice is enabled
+      if (voiceEnabled && !isListening) {
+        setTimeout(() => startListening(), 1000);
       }
 
     } catch (error) {
