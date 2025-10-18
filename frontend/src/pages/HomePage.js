@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, Send, TrendingUp, Zap, Target, BarChart3, Mail, Share2, Search, DollarSign, ArrowRight, Check, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Sparkles, Send, TrendingUp, Zap, Target, BarChart3, Mail, Share2, Search, DollarSign, ArrowRight, Check, Mic, MicOff, Volume2, VolumeX, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 import { useVoice } from "@/hooks/useVoice";
