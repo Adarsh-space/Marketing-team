@@ -49,6 +49,9 @@ const HomePage = () => {
     // Check HubSpot connection status
     checkHubSpotStatus();
     
+    // Load supported languages
+    loadLanguages();
+    
     // Check if redirected from HubSpot OAuth
     const params = new URLSearchParams(window.location.search);
     if (params.get('hubspot_connected') === 'true') {
@@ -58,6 +61,24 @@ const HomePage = () => {
       window.history.replaceState({}, '', '/');
     }
   }, []);
+
+  // Start/stop continuous listening when voice is enabled
+  useEffect(() => {
+    if (voiceEnabled && showChat && !isListening && !loading) {
+      startListening();
+    } else if (!voiceEnabled && isListening) {
+      stopListening();
+    }
+  }, [voiceEnabled, showChat, isListening, loading, startListening, stopListening]);
+
+  const loadLanguages = async () => {
+    try {
+      const response = await axios.get(`${API}/voice/languages`);
+      setLanguages(response.data.languages);
+    } catch (error) {
+      console.error('Error loading languages:', error);
+    }
+  };
 
   const checkHubSpotStatus = async () => {
     try {
