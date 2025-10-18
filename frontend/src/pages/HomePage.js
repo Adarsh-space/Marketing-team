@@ -398,18 +398,18 @@ const HomePage = () => {
                     <SelectValue placeholder="Language" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">🇬🇧 English</SelectItem>
-                    <SelectItem value="es">🇪🇸 Spanish</SelectItem>
-                    <SelectItem value="fr">🇫🇷 French</SelectItem>
-                    <SelectItem value="de">🇩🇪 German</SelectItem>
-                    <SelectItem value="it">🇮🇹 Italian</SelectItem>
-                    <SelectItem value="pt">🇵🇹 Portuguese</SelectItem>
-                    <SelectItem value="zh">🇨🇳 Chinese</SelectItem>
-                    <SelectItem value="ja">🇯🇵 Japanese</SelectItem>
-                    <SelectItem value="ar">🇸🇦 Arabic</SelectItem>
-                    <SelectItem value="hi">🇮🇳 Hindi</SelectItem>
-                    <SelectItem value="ru">🇷🇺 Russian</SelectItem>
-                    <SelectItem value="ko">🇰🇷 Korean</SelectItem>
+                    <SelectItem value="en-US">🇬🇧 English</SelectItem>
+                    <SelectItem value="es-ES">🇪🇸 Spanish</SelectItem>
+                    <SelectItem value="fr-FR">🇫🇷 French</SelectItem>
+                    <SelectItem value="de-DE">🇩🇪 German</SelectItem>
+                    <SelectItem value="it-IT">🇮🇹 Italian</SelectItem>
+                    <SelectItem value="pt-PT">🇵🇹 Portuguese</SelectItem>
+                    <SelectItem value="zh-CN">🇨🇳 Chinese</SelectItem>
+                    <SelectItem value="ja-JP">🇯🇵 Japanese</SelectItem>
+                    <SelectItem value="ar-SA">🇸🇦 Arabic</SelectItem>
+                    <SelectItem value="hi-IN">🇮🇳 Hindi</SelectItem>
+                    <SelectItem value="ru-RU">🇷🇺 Russian</SelectItem>
+                    <SelectItem value="ko-KR">🇰🇷 Korean</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
