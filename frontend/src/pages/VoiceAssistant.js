@@ -148,7 +148,7 @@ const VoiceAssistant = () => {
     }
   };
 
-  // Speak text using browser TTS with female voice
+  // Speak text using browser TTS with natural female voice
   const speakText = (text) => {
     if (!synthRef.current) return;
 
@@ -157,8 +157,8 @@ const VoiceAssistant = () => {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = selectedLanguage;
-    utterance.rate = 1.2; // Faster speech (20% faster)
-    utterance.pitch = 1.1; // Slightly higher pitch for sweeter voice
+    utterance.rate = 0.95; // Natural speaking pace (slightly slower)
+    utterance.pitch = 1.05; // Slightly higher pitch for pleasant female voice
     
     // Try to find a female voice
     const voices = synthRef.current.getVoices();
