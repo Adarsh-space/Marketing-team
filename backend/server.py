@@ -363,6 +363,48 @@ async def get_dashboard():
         logger.error(f"Error fetching dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Settings Endpoints ====================
+
+@api_router.get("/settings")
+async def get_settings(user_id: str = "default_user"):
+    """Get user settings and credentials."""
+    try:
+        settings = await db.settings.find_one(
+            {"user_id": user_id},
+            {"_id": 0}
+        )
+        
+        if not settings:
+            return {"credentials": {}}
+        
+        return settings
+        
+    except Exception as e:
+        logger.error(f"Error fetching settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/settings")
+async def save_settings(data: Dict[str, Any], user_id: str = "default_user"):
+    """Save user settings and credentials."""
+    try:
+        settings = {
+            "user_id": user_id,
+            "credentials": data.get("credentials", {}),
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.settings.update_one(
+            {"user_id": user_id},
+            {"$set": settings},
+            upsert=True
+        )
+        
+        return {"status": "success", "message": "Settings saved"}
+        
+    except Exception as e:
+        logger.error(f"Error saving settings: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Voice Endpoints ====================
 
 @api_router.post("/voice/speech-to-text")
