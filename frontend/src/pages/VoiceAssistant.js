@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Mic, MicOff, Volume2, VolumeX, MessageSquare, ArrowLeft } from "lucide-react";
+import { Sparkles, Mic, MicOff, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
@@ -15,138 +15,97 @@ const VoiceAssistant = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
-  const [audioLevel, setAudioLevel] = useState(0);
   const [processing, setProcessing] = useState(false);
   
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
-  const streamRef = useRef(null);
-  const analyserRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const animationFrameRef = useRef(null);
-  const audioElementRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const synthRef = useRef(null);
 
-  // Monitor audio level
-  const monitorAudioLevel = () => {
-    if (!analyserRef.current) return;
+  // Initialize Speech Recognition and Synthesis
+  useEffect(() => {
+    // Initialize Speech Recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
 
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
-    const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-    setAudioLevel(average);
-    animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
-  };
+      recognitionRef.current.onresult = async (event) => {
+        const transcript = event.results[0][0].transcript;
+        console.log('Transcript:', transcript);
+        
+        // Stop listening
+        setIsListening(false);
+        
+        // Process the transcript
+        await processTranscript(transcript);
+      };
 
-  // Start recording
-  const startListening = async () => {
-    try {
-      audioChunksRef.current = [];
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
-      streamRef.current = stream;
-
-      // Setup audio visualization
-      audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 256;
-      source.connect(analyserRef.current);
-      monitorAudioLevel();
-
-      // Setup recorder
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
-        ? 'audio/webm'
-        : 'audio/wav';
-      
-      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType });
-
-      mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
+      recognitionRef.current.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        setIsListening(false);
+        
+        if (event.error === 'no-speech') {
+          toast.error('No speech detected. Please try again.');
+        } else if (event.error === 'not-allowed') {
+          toast.error('Microphone access denied. Please allow microphone access.');
+        } else {
+          toast.error('Speech recognition error. Please try again.');
         }
       };
 
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        await processAudio(audioBlob);
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
       };
+    }
 
-      mediaRecorderRef.current.start();
+    // Initialize Speech Synthesis
+    synthRef.current = window.speechSynthesis;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (synthRef.current) {
+        synthRef.current.cancel();
+      }
+    };
+  }, []);
+
+  // Start listening
+  const startListening = () => {
+    if (!recognitionRef.current) {
+      toast.error('Speech recognition not supported in this browser. Please use Chrome or Edge.');
+      return;
+    }
+
+    try {
+      recognitionRef.current.start();
       setIsListening(true);
       toast.success('Listening... Speak now!');
-
     } catch (err) {
-      console.error('Microphone error:', err);
-      toast.error('Failed to access microphone');
+      console.error('Error starting recognition:', err);
+      toast.error('Failed to start listening. Please try again.');
     }
   };
 
-  // Stop recording
+  // Stop listening
   const stopListening = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
     }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
-
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-    }
-
     setIsListening(false);
-    setAudioLevel(0);
   };
 
-  // Process audio through OpenAI Whisper or fallback to browser speech recognition
-  const processAudio = async (audioBlob) => {
+  // Process transcript
+  const processTranscript = async (transcript) => {
     try {
       setProcessing(true);
       
-      // Add user audio message
-      setMessages(prev => [...prev, { role: "user", type: "audio", processing: true }]);
+      // Add user message
+      setMessages(prev => [...prev, { role: "user", content: transcript }]);
 
-      let transcript = "";
-      
-      // Try OpenAI Whisper first
-      try {
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.webm');
-        formData.append('language', 'en');
-
-        const transcriptResponse = await axios.post(`${API}/voice/speech-to-text`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-
-        transcript = transcriptResponse.data.transcript;
-      } catch (whisperError) {
-        console.error('Whisper API error, trying browser speech recognition:', whisperError);
-        toast.warning('OpenAI Whisper unavailable, using browser speech recognition');
-        
-        // Fallback to browser speech recognition
-        transcript = await transcribeWithBrowser(audioBlob);
-      }
-      
-      // Update user message with transcript
-      setMessages(prev => prev.map((msg, idx) => 
-        idx === prev.length - 1 && msg.processing 
-          ? { ...msg, content: transcript, processing: false }
-          : msg
-      ));
-      
-      // Step 2: Get AI response
+      // Get AI response
       const chatResponse = await axios.post(`${API}/chat`, {
         message: transcript,
         conversation_id: conversationId
@@ -159,132 +118,77 @@ const VoiceAssistant = () => {
       }
 
       // Add AI response
-      setMessages(prev => [...prev, { role: "assistant", content: aiResponse, type: "text" }]);
+      setMessages(prev => [...prev, { role: "assistant", content: aiResponse }]);
 
-      // Step 3: Speak response with TTS (try OpenAI, fallback to browser)
-      try {
-        await speakText(aiResponse);
-      } catch (ttsError) {
-        console.error('TTS error, using browser speech:', ttsError);
-        speakWithBrowser(aiResponse);
-      }
+      // Speak the response
+      speakText(aiResponse);
 
       // Check if campaign created
       if (chatResponse.data.ready_to_plan && chatResponse.data.campaign_id) {
-        toast.success('Campaign created!');
+        toast.success('Campaign created! Redirecting...');
         setTimeout(() => {
           navigate(`/campaign/${chatResponse.data.campaign_id}`);
-        }, 2000);
+        }, 3000);
       }
 
     } catch (error) {
       console.error('Processing error:', error);
-      
-      // Show specific error message
-      if (error.response?.status === 429) {
-        toast.error('OpenAI API quota exceeded. Please add credits to your OpenAI account or provide a valid API key.');
-      } else {
-        toast.error('Failed to process audio. Please try again.');
-      }
-      
-      setMessages(prev => prev.filter(msg => !msg.processing));
+      toast.error('Failed to process your message. Please try again.');
     } finally {
       setProcessing(false);
     }
   };
 
-  // Fallback: Use text input if speech recognition fails
-  const transcribeWithBrowser = async (audioBlob) => {
-    // Since browser speech recognition can't process audio blobs directly,
-    // we'll show an error and ask user to type or add credits
-    toast.error('OpenAI Whisper API has no credits. Please add credits or type your message.');
-    throw new Error('Whisper API unavailable - add OpenAI credits to use voice');
-  };
+  // Speak text using browser TTS
+  const speakText = (text) => {
+    if (!synthRef.current) return;
 
-  // Fallback: Speak using browser Speech Synthesis
-  const speakWithBrowser = (text) => {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
+    // Cancel any ongoing speech
+    synthRef.current.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     utterance.rate = 1.0;
+    utterance.pitch = 1.0;
     
-    const voices = synth.getVoices();
-    const enVoice = voices.find(v => v.lang.startsWith('en'));
-    if (enVoice) utterance.voice = enVoice;
+    // Try to use a good quality voice
+    const voices = synthRef.current.getVoices();
+    const goodVoice = voices.find(v => 
+      v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Microsoft'))
+    );
+    if (goodVoice) {
+      utterance.voice = goodVoice;
+    }
 
-    setIsSpeaking(true);
+    utterance.onstart = () => setIsSpeaking(true);
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
-    
-    synth.speak(utterance);
+
+    synthRef.current.speak(utterance);
   };
 
-  // Speak text with OpenAI TTS
-  const speakText = async (text) => {
-    try {
-      setIsSpeaking(true);
-
-      const response = await axios.post(
-        `${API}/voice/text-to-speech`,
-        { text, voice: 'nova', speed: 1.0 },
-        { responseType: 'blob' }
-      );
-
-      const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
-      const audioUrl = URL.createObjectURL(audioBlob);
-      
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-      }
-
-      const audio = new Audio(audioUrl);
-      audioElementRef.current = audio;
-      
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
-      };
-
-      audio.onerror = () => {
-        setIsSpeaking(false);
-        toast.error('Failed to play audio');
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.error('TTS error:', err);
+  // Stop speaking
+  const stopSpeaking = () => {
+    if (synthRef.current) {
+      synthRef.current.cancel();
       setIsSpeaking(false);
     }
   };
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      stopListening();
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-      }
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg bg-black/30 border-b border-white/10">
         <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => navigate('/')}
-              className="text-white hover:bg-white/10"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </div>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => navigate('/')}
+            className="text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
@@ -305,7 +209,8 @@ const VoiceAssistant = () => {
                   <Mic className="w-12 h-12 text-white" />
                 </div>
                 <h2 className="text-3xl font-bold text-white mb-3">Start a Conversation</h2>
-                <p className="text-lg text-slate-300">Click the microphone to begin speaking with your AI marketing assistant</p>
+                <p className="text-lg text-slate-300 mb-2">Click the microphone to begin</p>
+                <p className="text-sm text-slate-400">Powered by Browser Speech Recognition</p>
               </div>
             )}
             
@@ -334,18 +239,7 @@ const VoiceAssistant = () => {
                     <p className="text-sm font-medium text-slate-300 mb-1">
                       {msg.role === 'user' ? 'You' : 'AI Assistant'}
                     </p>
-                    {msg.processing ? (
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <div className="flex gap-1">
-                          <div className="w-2 h-2 bg-cyan-500 rounded-full animate-pulse"></div>
-                          <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
-                          <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
-                        </div>
-                        <span className="text-sm">Processing...</span>
-                      </div>
-                    ) : (
-                      <p className="text-white leading-relaxed">{msg.content}</p>
-                    )}
+                    <p className="text-white leading-relaxed">{msg.content}</p>
                   </div>
                 </div>
               </Card>
@@ -358,43 +252,25 @@ const VoiceAssistant = () => {
       <div className="fixed bottom-0 left-0 right-0 z-50">
         <div className="max-w-4xl mx-auto px-6 pb-8">
           <Card className="backdrop-blur-2xl bg-black/40 border-white/20 p-8 shadow-2xl">
-            {/* Audio Visualization */}
-            {isListening && (
-              <div className="mb-6">
-                <div className="flex gap-1 items-end justify-center h-24">
-                  {[...Array(40)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 bg-gradient-to-t from-cyan-500 to-blue-500 rounded-t transition-all duration-75"
-                      style={{
-                        height: `${Math.max(10, (audioLevel / 255) * 100 * (0.3 + Math.random() * 0.7))}%`,
-                        opacity: 0.8
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Status */}
             <div className="text-center mb-6">
               <p className="text-2xl font-semibold text-white mb-2">
-                {isListening ? 'Listening...' : isSpeaking ? 'Speaking...' : processing ? 'Processing...' : 'Ready'}
+                {isListening ? '🎤 Listening...' : isSpeaking ? '🔊 Speaking...' : processing ? '⚙️ Processing...' : '✅ Ready'}
               </p>
               <p className="text-slate-400">
-                {isListening ? 'Speak clearly into your microphone' : isSpeaking ? 'Playing AI response' : processing ? 'Transcribing and thinking...' : 'Click the button to start'}
+                {isListening ? 'Speak clearly into your microphone' : isSpeaking ? 'Playing AI response' : processing ? 'Getting AI response...' : 'Click the button to start'}
               </p>
             </div>
 
             {/* Control Button */}
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-4">
               <Button
                 size="lg"
                 disabled={processing || isSpeaking}
                 onClick={isListening ? stopListening : startListening}
                 className={`w-24 h-24 rounded-full ${
                   isListening
-                    ? 'bg-gradient-to-br from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'
+                    ? 'bg-gradient-to-br from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 animate-pulse'
                     : 'bg-gradient-to-br from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600'
                 } shadow-2xl transition-all duration-300 hover:scale-110`}
                 data-testid="voice-button"
@@ -405,11 +281,22 @@ const VoiceAssistant = () => {
                   <Mic className="w-10 h-10 text-white" />
                 )}
               </Button>
+              
+              {isSpeaking && (
+                <Button
+                  size="lg"
+                  onClick={stopSpeaking}
+                  className="w-24 h-24 rounded-full bg-gradient-to-br from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-2xl"
+                >
+                  ⏸️
+                </Button>
+              )}
             </div>
 
             {/* Helper Text */}
             <div className="mt-6 text-center text-sm text-slate-400">
-              <p>Click to {isListening ? 'stop' : 'start'} recording • Powered by OpenAI Whisper & GPT</p>
+              <p>Click to {isListening ? 'stop' : 'start'} • Free Browser Speech Recognition</p>
+              <p className="text-xs mt-1">Works best in Chrome or Edge</p>
             </div>
           </Card>
         </div>
