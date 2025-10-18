@@ -21,6 +21,29 @@ const HomePage = () => {
   const [conversationId, setConversationId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hubspotConnected, setHubspotConnected] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(true);
+  const [languages, setLanguages] = useState({});
+
+  // Voice hook with automatic transcription
+  const handleTranscript = (transcript) => {
+    setMessage(transcript);
+    // Auto-send after voice input
+    setTimeout(() => {
+      handleSendMessage(transcript);
+    }, 500);
+  };
+
+  const { 
+    isListening, 
+    isSpeaking, 
+    audioLevel,
+    startListening, 
+    stopListening, 
+    speak, 
+    stopSpeaking 
+  } = useVoice(handleTranscript, selectedLanguage);
 
   useEffect(() => {
     // Check HubSpot connection status
