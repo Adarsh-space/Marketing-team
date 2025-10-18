@@ -296,6 +296,7 @@ const VoiceAssistant = () => {
                 </div>
               </Card>
             ))}
+            <div ref={messagesEndRef} />
           </div>
         </div>
       </div>
