@@ -148,7 +148,7 @@ const VoiceAssistant = () => {
     }
   };
 
-  // Speak text using browser TTS
+  // Speak text using browser TTS with female voice
   const speakText = (text) => {
     if (!synthRef.current) return;
 
@@ -156,17 +156,35 @@ const VoiceAssistant = () => {
     synthRef.current.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.lang = selectedLanguage;
+    utterance.rate = 1.2; // Faster speech (20% faster)
+    utterance.pitch = 1.1; // Slightly higher pitch for sweeter voice
     
-    // Try to use a good quality voice
+    // Try to find a female voice
     const voices = synthRef.current.getVoices();
-    const goodVoice = voices.find(v => 
-      v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Microsoft'))
+    
+    // Priority: Find female English voice
+    const femaleVoice = voices.find(v => 
+      v.lang.startsWith(selectedLanguage.split('-')[0]) && 
+      (v.name.includes('Female') || v.name.includes('female') || 
+       v.name.includes('woman') || v.name.includes('Woman') ||
+       v.name.includes('Samantha') || v.name.includes('Victoria') ||
+       v.name.includes('Karen') || v.name.includes('Moira') ||
+       v.name.includes('Fiona') || v.name.includes('Tessa'))
     );
-    if (goodVoice) {
+    
+    // Fallback: Any good quality voice for the language
+    const goodVoice = voices.find(v => 
+      v.lang.startsWith(selectedLanguage.split('-')[0]) && 
+      (v.name.includes('Google') || v.name.includes('Microsoft') || v.name.includes('Natural'))
+    );
+    
+    if (femaleVoice) {
+      utterance.voice = femaleVoice;
+      console.log('Using female voice:', femaleVoice.name);
+    } else if (goodVoice) {
       utterance.voice = goodVoice;
+      console.log('Using voice:', goodVoice.name);
     }
 
     utterance.onstart = () => setIsSpeaking(true);
