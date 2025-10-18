@@ -45,3 +45,19 @@ class EmailAgent(BaseAgent):
             system_prompt=EMAIL_SYSTEM_PROMPT,
             model="gpt-4o"
         )
+    
+    def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
+        """Parse agent response to JSON."""
+        try:
+            import json
+            if '```json' in response:
+                start = response.find('```json') + 7
+                end = response.find('```', start)
+                response = response[start:end].strip()
+            elif '```' in response:
+                start = response.find('```') + 3
+                end = response.find('```', start)
+                response = response[start:end].strip()
+            return json.loads(response)
+        except json.JSONDecodeError:
+            return {"result": response}
