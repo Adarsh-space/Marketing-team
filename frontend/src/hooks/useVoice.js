@@ -1,8 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import axios from 'axios';
-
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
 
 export const useVoice = (onTranscript, language = 'en') => {
   const [isListening, setIsListening] = useState(false);
@@ -10,14 +6,13 @@ export const useVoice = (onTranscript, language = 'en') => {
   const [error, setError] = useState(null);
   const [audioLevel, setAudioLevel] = useState(0);
   
-  const mediaRecorderRef = useRef(null);
-  const audioChunksRef = useRef([]);
+  const recognitionRef = useRef(null);
+  const synthRef = useRef(null);
   const streamRef = useRef(null);
   const analyserRef = useRef(null);
   const audioContextRef = useRef(null);
   const animationFrameRef = useRef(null);
-  const silenceTimerRef = useRef(null);
-  const audioElementRef = useRef(null);
+  const restartTimerRef = useRef(null);
 
   // Audio level monitoring
   const monitorAudioLevel = useCallback(() => {
