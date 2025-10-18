@@ -140,8 +140,12 @@ export const useVoice = (onTranscript, language = 'en') => {
 
   // Stop listening
   const stopListening = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        console.log('Recognition already stopped');
+      }
     }
 
     if (streamRef.current) {
@@ -152,9 +156,9 @@ export const useVoice = (onTranscript, language = 'en') => {
       cancelAnimationFrame(animationFrameRef.current);
     }
 
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
     }
 
     if (audioContextRef.current) {
@@ -165,73 +169,57 @@ export const useVoice = (onTranscript, language = 'en') => {
     setAudioLevel(0);
   }, []);
 
-  // Transcribe audio
-  const transcribeAudio = async (audioBlob) => {
-    try {
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-      formData.append('language', language);
-
-      const response = await axios.post(`${API}/voice/speech-to-text`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      const transcript = response.data.transcript;
-      if (transcript && onTranscript) {
-        onTranscript(transcript);
-      }
-    } catch (err) {
-      console.error('Transcription error:', err);
-      setError('Failed to transcribe audio');
-    }
-  };
-
   // Speak text
-  const speak = useCallback(async (text, voiceType = 'nova') => {
+  const speak = useCallback((text, voiceType = 'default') => {
+    if (!synthRef.current) {
+      setError('Speech synthesis not supported');
+      return;
+    }
+
     try {
-      setIsSpeaking(true);
-      setError(null);
+      // Cancel any ongoing speech
+      synthRef.current.cancel();
 
-      const response = await axios.post(
-        `${API}/voice/text-to-speech`,
-        { text, voice: voiceType },
-        { responseType: 'blob' }
-      );
-
-      const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
-      const audioUrl = URL.createObjectURL(audioBlob);
+      const utterance = new SpeechSynthesisUtterance(text);
       
-      if (audioElementRef.current) {
-        audioElementRef.current.pause();
-        audioElementRef.current = null;
+      // Set language
+      utterance.lang = language;
+      
+      // Get available voices
+      const voices = synthRef.current.getVoices();
+      
+      // Try to find a voice for the selected language
+      const langVoice = voices.find(v => v.lang.startsWith(language));
+      if (langVoice) {
+        utterance.voice = langVoice;
       }
 
-      const audio = new Audio(audioUrl);
-      audioElementRef.current = audio;
-      
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl);
+      utterance.onstart = () => {
+        setIsSpeaking(true);
       };
 
-      audio.onerror = () => {
+      utterance.onend = () => {
         setIsSpeaking(false);
-        setError('Failed to play audio');
       };
 
-      await audio.play();
+      utterance.onerror = (event) => {
+        console.error('Speech synthesis error:', event);
+        setIsSpeaking(false);
+        setError('Failed to speak text');
+      };
+
+      synthRef.current.speak(utterance);
     } catch (err) {
       console.error('Text-to-speech error:', err);
       setError('Failed to generate speech');
       setIsSpeaking(false);
     }
-  }, []);
+  }, [language]);
 
   // Stop speaking
   const stopSpeaking = useCallback(() => {
-    if (audioElementRef.current) {
-      audioElementRef.current.pause();
-      audioElementRef.current = null;
+    if (synthRef.current) {
+      synthRef.current.cancel();
       setIsSpeaking(false);
     }
   }, []);
