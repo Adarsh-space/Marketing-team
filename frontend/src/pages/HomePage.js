@@ -501,7 +501,7 @@ const HomePage = () => {
             </div>
 
             {/* Input */}
-            <div className="p-6 border-t border-white/20">
+            <div className="p-6 border-t border-white/20 flex-shrink-0">
               <div className="flex gap-3">
                 <Input 
                   value={message}
