@@ -34,9 +34,14 @@ class VoiceService:
     AVAILABLE_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
     
     def __init__(self):
-        api_key = os.environ.get('EMERGENT_LLM_KEY')
+        # Use OpenAI key for voice services
+        api_key = os.environ.get('OPENAI_API_KEY')
         if not api_key:
-            raise ValueError("EMERGENT_LLM_KEY not found in environment")
+            # Fallback to Emergent key
+            api_key = os.environ.get('EMERGENT_LLM_KEY')
+        
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY or EMERGENT_LLM_KEY not found in environment")
         
         self.client = OpenAI(api_key=api_key)
         logger.info("VoiceService initialized with OpenAI client")
