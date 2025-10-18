@@ -193,42 +193,12 @@ const VoiceAssistant = () => {
     }
   };
 
-  // Fallback: Transcribe using browser Speech Recognition
-  const transcribeWithBrowser = (audioBlob) => {
-    return new Promise((resolve, reject) => {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
-        reject(new Error('Browser speech recognition not supported'));
-        return;
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'en-US';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      // Play the audio blob through recognition
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audio = new Audio(audioUrl);
-      
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        URL.revokeObjectURL(audioUrl);
-        resolve(transcript);
-      };
-
-      recognition.onerror = (event) => {
-        console.error('Browser recognition error:', event.error);
-        URL.revokeObjectURL(audioUrl);
-        reject(new Error('Speech recognition failed'));
-      };
-
-      // Note: Browser speech recognition works with microphone, not audio files
-      // So we'll use a simple placeholder if it fails
-      setTimeout(() => {
-        resolve("I want to create a marketing campaign"); // Fallback text
-      }, 1000);
-    });
+  // Fallback: Use text input if speech recognition fails
+  const transcribeWithBrowser = async (audioBlob) => {
+    // Since browser speech recognition can't process audio blobs directly,
+    // we'll show an error and ask user to type or add credits
+    toast.error('OpenAI Whisper API has no credits. Please add credits or type your message.');
+    throw new Error('Whisper API unavailable - add OpenAI credits to use voice');
   };
 
   // Fallback: Speak using browser Speech Synthesis
