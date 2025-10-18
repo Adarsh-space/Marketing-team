@@ -133,10 +133,19 @@ const VoiceAssistant = () => {
         transcript = transcriptResponse.data.transcript;
       } catch (whisperError) {
         console.error('Whisper API error, trying browser speech recognition:', whisperError);
+        toast.warning('OpenAI Whisper unavailable, using browser speech recognition');
         
         // Fallback to browser speech recognition
         transcript = await transcribeWithBrowser(audioBlob);
       }
+      
+      // Update user message with transcript
+      setMessages(prev => prev.map((msg, idx) => 
+        idx === prev.length - 1 && msg.processing 
+          ? { ...msg, content: transcript, processing: false }
+          : msg
+      ));
+      
       // Step 2: Get AI response
       const chatResponse = await axios.post(`${API}/chat`, {
         message: transcript,
