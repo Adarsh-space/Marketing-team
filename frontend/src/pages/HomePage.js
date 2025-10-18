@@ -4,9 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Send, TrendingUp, Zap, Target, BarChart3, Mail, Share2, Search, DollarSign, ArrowRight, Check } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, Send, TrendingUp, Zap, Target, BarChart3, Mail, Share2, Search, DollarSign, ArrowRight, Check, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
+import { useVoice } from "@/hooks/useVoice";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
