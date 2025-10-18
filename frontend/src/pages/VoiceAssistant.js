@@ -87,9 +87,11 @@ const VoiceAssistant = () => {
     }
 
     try {
+      // Update language before starting
+      recognitionRef.current.lang = selectedLanguage;
       recognitionRef.current.start();
       setIsListening(true);
-      toast.success('Listening... Speak now!');
+      toast.success('🎤 Listening... Speak now!');
     } catch (err) {
       console.error('Error starting recognition:', err);
       toast.error('Failed to start listening. Please try again.');
