@@ -21,7 +21,7 @@ const HomePage = () => {
   const [conversationId, setConversationId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [hubspotConnected, setHubspotConnected] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [languages, setLanguages] = useState({});
