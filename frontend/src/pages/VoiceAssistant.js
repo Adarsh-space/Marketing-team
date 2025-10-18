@@ -16,9 +16,16 @@ const VoiceAssistant = () => {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [processing, setProcessing] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   
   const recognitionRef = useRef(null);
   const synthRef = useRef(null);
+  const messagesEndRef = useRef(null);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Initialize Speech Recognition and Synthesis
   useEffect(() => {
