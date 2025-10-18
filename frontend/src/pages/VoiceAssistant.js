@@ -110,7 +110,7 @@ const VoiceAssistant = () => {
     setAudioLevel(0);
   };
 
-  // Process audio through OpenAI Whisper
+  // Process audio through OpenAI Whisper or fallback to browser speech recognition
   const processAudio = async (audioBlob) => {
     try {
       setProcessing(true);
@@ -118,16 +118,25 @@ const VoiceAssistant = () => {
       // Add user audio message
       setMessages(prev => [...prev, { role: "user", type: "audio", processing: true }]);
 
-      // Step 1: Transcribe with Whisper
-      const formData = new FormData();
-      formData.append('audio', audioBlob, 'recording.webm');
-      formData.append('language', 'en');
+      let transcript = "";
+      
+      // Try OpenAI Whisper first
+      try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.webm');
+        formData.append('language', 'en');
 
-      const transcriptResponse = await axios.post(`${API}/voice/speech-to-text`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+        const transcriptResponse = await axios.post(`${API}/voice/speech-to-text`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
 
-      const transcript = transcriptResponse.data.transcript;
+        transcript = transcriptResponse.data.transcript;
+      } catch (whisperError) {
+        console.error('Whisper API error, trying browser speech recognition:', whisperError);
+        
+        // Fallback to browser speech recognition
+        transcript = await transcribeWithBrowser(audioBlob);
+      }
       
       // Update user message with transcript
       setMessages(prev => prev.map((msg, idx) => 
