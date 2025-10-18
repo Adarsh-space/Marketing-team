@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import HomePage from "@/pages/HomePage";
 import CampaignPage from "@/pages/CampaignPage";
 import DashboardPage from "@/pages/DashboardPage";
+import VoiceAssistant from "@/pages/VoiceAssistant";
 import "@/App.css";
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/voice" element={<VoiceAssistant />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/campaign/:campaignId" element={<CampaignPage />} />
         </Routes>
