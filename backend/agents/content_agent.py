@@ -62,3 +62,19 @@ class ContentAgent(BaseAgent):
             system_prompt=CONTENT_SYSTEM_PROMPT,
             model="gpt-4o"
         )
+    
+    def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
+        """Parse content response to JSON."""
+        try:
+            import json
+            if '```json' in response:
+                start = response.find('```json') + 7
+                end = response.find('```', start)
+                response = response[start:end].strip()
+            elif '```' in response:
+                start = response.find('```') + 3
+                end = response.find('```', start)
+                response = response[start:end].strip()
+            return json.loads(response)
+        except json.JSONDecodeError:
+            return {"generated_content": response}
