@@ -206,27 +206,52 @@ const VoiceAssistant = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg bg-black/30 border-b border-white/10">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => navigate('/')}
-            className="text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
-              <Sparkles className="w-4 h-4 text-white" />
+        <div className="max-w-4xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-3">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => navigate('/')}
+              className="text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-white font-semibold">Voice Assistant</span>
             </div>
-            <span className="text-white font-semibold">Voice Assistant</span>
+          </div>
+          
+          {/* Language Selector */}
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-sm text-slate-300">Language:</span>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value)}
+              className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 text-sm backdrop-blur-lg hover:bg-white/20 transition-all"
+            >
+              <option value="en-US">🇺🇸 English (US)</option>
+              <option value="en-GB">🇬🇧 English (UK)</option>
+              <option value="es-ES">🇪🇸 Spanish</option>
+              <option value="fr-FR">🇫🇷 French</option>
+              <option value="de-DE">🇩🇪 German</option>
+              <option value="it-IT">🇮🇹 Italian</option>
+              <option value="pt-PT">🇵🇹 Portuguese</option>
+              <option value="zh-CN">🇨🇳 Chinese</option>
+              <option value="ja-JP">🇯🇵 Japanese</option>
+              <option value="ko-KR">🇰🇷 Korean</option>
+              <option value="hi-IN">🇮🇳 Hindi</option>
+              <option value="ar-SA">🇸🇦 Arabic</option>
+            </select>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="pt-24 pb-40 px-6">
+      {/* Main Content - Scrollable */}
+      <div className="pt-32 pb-40 px-6 h-screen overflow-y-auto">
         <div className="max-w-4xl mx-auto">
           {/* Messages */}
           <div className="space-y-6 mb-8">
