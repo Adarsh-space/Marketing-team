@@ -137,14 +137,6 @@ const VoiceAssistant = () => {
         // Fallback to browser speech recognition
         transcript = await transcribeWithBrowser(audioBlob);
       }
-      
-      // Update user message with transcript
-      setMessages(prev => prev.map((msg, idx) => 
-        idx === prev.length - 1 && msg.processing 
-          ? { ...msg, content: transcript, processing: false }
-          : msg
-      ));
-
       // Step 2: Get AI response
       const chatResponse = await axios.post(`${API}/chat`, {
         message: transcript,
@@ -160,8 +152,13 @@ const VoiceAssistant = () => {
       // Add AI response
       setMessages(prev => [...prev, { role: "assistant", content: aiResponse, type: "text" }]);
 
-      // Step 3: Speak response with TTS
-      await speakText(aiResponse);
+      // Step 3: Speak response with TTS (try OpenAI, fallback to browser)
+      try {
+        await speakText(aiResponse);
+      } catch (ttsError) {
+        console.error('TTS error, using browser speech:', ttsError);
+        speakWithBrowser(aiResponse);
+      }
 
       // Check if campaign created
       if (chatResponse.data.ready_to_plan && chatResponse.data.campaign_id) {
