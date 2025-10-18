@@ -232,6 +232,14 @@ const HomePage = () => {
               </Button>
             )}
             <Button 
+              onClick={() => navigate('/voice')}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30"
+              data-testid="voice-assistant-btn"
+            >
+              <Mic className="w-4 h-4 mr-2" />
+              Voice Assistant
+            </Button>
+            <Button 
               variant="outline" 
               onClick={() => navigate('/dashboard')}
               className="border-cyan-200 hover:bg-cyan-50"
