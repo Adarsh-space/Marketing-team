@@ -232,6 +232,14 @@ const HomePage = () => {
               </Button>
             )}
             <Button 
+              onClick={() => navigate('/settings')}
+              variant="outline"
+              size="sm"
+              className="border-cyan-200 hover:bg-cyan-50"
+            >
+              ⚙️ Settings
+            </Button>
+            <Button 
               onClick={() => navigate('/voice')}
               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-lg shadow-purple-500/30"
               data-testid="voice-assistant-btn"
