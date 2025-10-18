@@ -50,3 +50,22 @@ class MarketResearchAgent(BaseAgent):
             system_prompt=MARKET_RESEARCH_SYSTEM_PROMPT,
             model="gpt-4o"
         )
+    
+    def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
+        """Parse research response to JSON."""
+        try:
+            import json
+            # Extract JSON from response (handle markdown code blocks)
+            if '```json' in response:
+                start = response.find('```json') + 7
+                end = response.find('```', start)
+                response = response[start:end].strip()
+            elif '```' in response:
+                start = response.find('```') + 3
+                end = response.find('```', start)
+                response = response[start:end].strip()
+            
+            return json.loads(response)
+        except json.JSONDecodeError:
+            # Return raw response if JSON parsing fails
+            return {"raw_research": response}
