@@ -338,7 +338,7 @@ const HomePage = () => {
       {/* Chat Modal */}
       {showChat && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" data-testid="chat-modal">
-          <Card className="w-full max-w-2xl h-[600px] flex flex-col glass border-white/30 shadow-2xl">
+          <Card className="w-full max-w-2xl h-[700px] flex flex-col glass border-white/30 shadow-2xl">
             {/* Chat Header */}
             <div className="p-6 border-b border-white/20">
               <div className="flex items-center justify-between mb-4">
