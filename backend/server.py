@@ -1,5 +1,5 @@
-from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Query
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Query, UploadFile, File, Form
+from fastapi.responses import RedirectResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -12,9 +12,11 @@ import uuid
 from datetime import datetime, timezone
 import httpx
 from authlib.integrations.starlette_client import OAuth
+import io
 
-# Import agent orchestrator
+# Import agent orchestrator and voice service
 from agents.orchestrator import AgentOrchestrator
+from voice_service import VoiceService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
