@@ -232,6 +232,18 @@ backend:
         agent: "testing"
         comment: "TESTED - Auto-publishing endpoint working correctly. POST /api/publish handles Facebook and Instagram publishing with proper error handling for invalid credentials. GET /api/publish/history retrieves publishing records. Endpoint validates credentials and provides clear error messages when credentials are invalid. Publishing workflow implemented correctly."
 
+  - task: "Campaign creation and execution endpoints"
+    implemented: true
+    working: false
+    file: "backend/server.py, backend/agents/orchestrator.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "CRITICAL ISSUE - Campaign creation failing with 500 error and RecursionError in FastAPI JSON encoder. Campaign listing works (shows 2 existing campaigns). Issue appears to be circular reference in data structures returned by orchestrator. Needs investigation of MongoDB ObjectId serialization or circular references in agent responses."
+
   - task: "HubSpot Private App integration (simplified)"
     implemented: false
     working: "NA"
