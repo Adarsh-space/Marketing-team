@@ -413,6 +413,73 @@ async def agent_chat(data: Dict[str, Any]):
         logger.error(f"Agent chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Image Generation Endpoints ====================
+
+@api_router.post("/generate-image")
+async def generate_image(data: Dict[str, Any]):
+    """
+    Generate marketing image using AI.
+    
+    Expected data:
+    {
+        "content": "Marketing content/post text",
+        "brand_info": "Brand information (optional)",
+        "platform": "Target platform like Instagram, Facebook (optional)",
+        "conversation_id": "conversation_id to get context (optional)"
+    }
+    """
+    try:
+        content = data.get("content", "")
+        brand_info = data.get("brand_info", "")
+        platform = data.get("platform", "social media")
+        conversation_id = data.get("conversation_id")
+        
+        # If conversation_id provided, get additional context
+        if conversation_id:
+            conversation = await db.conversations.find_one({"conversation_id": conversation_id})
+            if conversation:
+                # Extract brand info from conversation history
+                messages = conversation.get("messages", [])
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        user_content = msg.get("content", "")
+                        # Look for website mentions or brand names
+                        if "website" in user_content.lower() or ".com" in user_content:
+                            brand_info += f" {user_content}"
+        
+        # Get ImageGenerationAgent
+        image_agent = orchestrator.agents.get("ImageGenerationAgent")
+        
+        if not image_agent:
+            raise HTTPException(status_code=500, detail="Image generation agent not available")
+        
+        # Generate image
+        logger.info(f"Generating image for content: {content[:100]}...")
+        result = await image_agent.generate_image_from_context({
+            "content": content,
+            "brand_info": brand_info,
+            "platform": platform
+        })
+        
+        if result.get("status") == "success":
+            return {
+                "status": "success",
+                "image_base64": result.get("image_base64"),
+                "prompt": result.get("prompt_used"),
+                "message": "Image generated successfully!"
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("message", "Image generation failed")
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Image generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Settings Endpoints ====================
 
 @api_router.get("/settings")
