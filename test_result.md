@@ -144,15 +144,18 @@ backend:
 
   - task: "HubSpot OAuth integration"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "OAuth flow implemented, credentials in .env, needs testing"
+      - working: true
+        agent: "testing"
+        comment: "TESTED - HubSpot status endpoint working (currently not connected). OAuth authorize endpoint working and generates valid HubSpot authorization URLs. Integration endpoints functioning correctly."
 
   - task: "Individual agent chat endpoint"
     implemented: true
