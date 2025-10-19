@@ -206,11 +206,22 @@ class AgentOrchestrator:
                     continue
                 
                 # Prepare task payload with context from previous tasks
-                task_payload = task.get("payload", {})
-                task_payload["task_id"] = task_id
-                task_payload["campaign_brief"] = campaign["brief"]
-                task_payload["plan"] = plan
-                task_payload["previous_results"] = task_results
+                # Only pass serializable data to avoid circular references
+                task_payload = {
+                    "task_id": task_id,
+                    "campaign_brief": campaign["brief"],
+                    "task_description": task.get("description", ""),
+                    "task_requirements": task.get("requirements", [])
+                }
+                
+                # Add previous task results but ensure they're clean
+                if task_results:
+                    task_payload["previous_results"] = {
+                        task_name: {
+                            "status": result.get("status"),
+                            "agent": result.get("agent")
+                        } for task_name, result in task_results.items()
+                    }
                 
                 logger.info(f"Executing task: {task_id} with agent: {agent_name}")
                 result = await agent.execute(task_payload)
