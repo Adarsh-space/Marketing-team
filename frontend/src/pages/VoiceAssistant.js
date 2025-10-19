@@ -245,6 +245,12 @@ const VoiceAssistant = () => {
               <option value="ko-KR">🇰🇷 Korean</option>
               <option value="hi-IN">🇮🇳 Hindi</option>
               <option value="ar-SA">🇸🇦 Arabic</option>
+              <option value="te-IN">🇮🇳 Telugu</option>
+              <option value="ta-IN">🇮🇳 Tamil</option>
+              <option value="kn-IN">🇮🇳 Kannada</option>
+              <option value="ml-IN">🇮🇳 Malayalam</option>
+              <option value="mr-IN">🇮🇳 Marathi</option>
+              <option value="bn-IN">🇮🇳 Bengali</option>
             </select>
           </div>
         </div>
