@@ -232,6 +232,14 @@ const HomePage = () => {
               </Button>
             )}
             <Button 
+              onClick={() => navigate('/agents')}
+              variant="outline"
+              size="sm"
+              className="border-purple-200 hover:bg-purple-50 text-purple-700"
+            >
+              🤖 Talk to Agents
+            </Button>
+            <Button 
               onClick={() => navigate('/settings')}
               variant="outline"
               size="sm"
