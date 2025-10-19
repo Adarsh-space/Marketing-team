@@ -73,4 +73,7 @@ class BaseAgent:
         Parse LLM response into structured data.
         Override in subclasses for agent-specific parsing.
         """
+        # Ensure response is a string
+        if not isinstance(response, str):
+            response = str(response)
         return response
