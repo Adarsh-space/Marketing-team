@@ -200,16 +200,16 @@ backend:
         comment: "GET and POST /api/settings endpoints exist"
 
   - task: "Auto-publishing endpoint for social media"
-    implemented: false
+    implemented: true
     working: "NA"
-    file: "backend/server.py"
+    file: "backend/server.py, backend/social_media_service.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
         agent: "main"
-        comment: "NOT IMPLEMENTED - needs to be created with Facebook/Instagram integration"
+        comment: "IMPLEMENTED - Created /api/publish endpoint with Facebook and Instagram posting using Meta Graph API. Two-stage Instagram workflow (container -> publish) implemented. Needs testing with valid credentials."
 
   - task: "HubSpot Private App integration (simplified)"
     implemented: false
