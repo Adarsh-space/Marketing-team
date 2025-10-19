@@ -380,16 +380,30 @@ async def agent_chat(data: Dict[str, Any]):
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
         
-        # Execute agent with message
-        result = await agent.execute({
+        # Prepare task payload based on agent type
+        task_payload = {
             "task_id": "direct_chat",
             "user_message": message,
-            "messages": data.get("messages", [])
-        })
-        
-        return {
-            "response": result.get("result", {}).get("response", result.get("result", ""))
+            "campaign_brief": {"product": "User inquiry", "target_audience": "General"},
+            "previous_results": {}
         }
+        
+        # Execute agent with message
+        result = await agent.execute(task_payload)
+        
+        # Extract response string from result
+        agent_result = result.get("result", {})
+        
+        # Handle different response formats
+        if isinstance(agent_result, dict):
+            response_text = agent_result.get("response", 
+                           agent_result.get("raw_research",
+                           agent_result.get("generated_content",
+                           str(agent_result))))
+        else:
+            response_text = str(agent_result)
+        
+        return {"response": response_text}
         
     except HTTPException:
         raise
