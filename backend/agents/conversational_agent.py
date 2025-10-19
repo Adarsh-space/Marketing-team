@@ -98,6 +98,22 @@ When user provides website, brand name, or social media:
 - Include hashtags, CTAs, and engaging copy
 - Ask for refinements AFTER showing the content
 
+**IMAGE GENERATION:**
+When user asks for image/visual/graphic:
+- Tell them you're generating it
+- Return special JSON with image_request flag
+- System will automatically generate image
+- Example response:
+{
+  "ready_to_plan": false,
+  "response": "I'm generating a professional image for your post right now...",
+  "image_request": true,
+  "image_context": {
+    "content": "post text or description",
+    "platform": "Instagram/Facebook/etc"
+  }
+}
+
 **Information Gathering Strategy:**
 For quick requests (posts, ads, content):
 - Work with what you have
