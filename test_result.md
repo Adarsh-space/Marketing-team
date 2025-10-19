@@ -349,11 +349,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Test auto-publishing endpoint with Facebook/Instagram"
-    - "Test agent communication visualization"
-    - "Test all backend endpoints comprehensively"
+    - "Fix campaign creation recursion error"
+    - "Fix OpenAI API quota issue for voice services"
     - "Test all frontend pages"
-  stuck_tasks: []
+  stuck_tasks: 
+    - "Campaign creation and execution endpoints"
   test_all: true
   test_priority: "high_first"
 
