@@ -199,26 +199,81 @@ Total content length: {len(text)} characters
         
         return urls
     
-    def _prepare_prompt(self, task_payload: Dict[str, Any]) -> str:
-        """Prepare prompt for conversational interaction."""
+    async def execute(self, task_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute agent task with web browsing support.
+        Overrides base execute to handle async web browsing.
+        """
+        try:
+            session_id = f"{self.agent_name}_{task_payload.get('task_id', 'unknown')}"
+            
+            # Check if user provided URLs and browse them FIRST
+            user_message = task_payload.get('user_message', '')
+            urls = self._extract_urls(user_message)
+            
+            website_info = ""
+            if urls:
+                logger.info(f"Found URLs to browse: {urls}")
+                for url in urls[:2]:  # Limit to 2 URLs
+                    try:
+                        content = await self.browse_website(url)
+                        website_info += f"\n{content}\n"
+                    except Exception as e:
+                        logger.error(f"Error browsing {url}: {str(e)}")
+                        website_info += f"\n❌ Could not browse {url}\n"
+            
+            # Add website info to task payload
+            if website_info:
+                task_payload['website_browsing_results'] = website_info
+            
+            # Prepare user message with website info
+            user_prompt = self._prepare_prompt_with_browsing(task_payload)
+            
+            # Initialize LLM chat
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            chat = LlmChat(
+                api_key=self.api_key,
+                session_id=session_id,
+                system_message=self.system_prompt
+            ).with_model("openai", self.model)
+            
+            user_msg = UserMessage(text=user_prompt)
+            
+            # Get LLM response
+            logger.info(f"{self.agent_name} processing task...")
+            response = await chat.send_message(user_msg)
+            
+            # Parse and structure response
+            result = self._parse_response(response, task_payload)
+            
+            return {
+                "status": "success",
+                "agent": self.agent_name,
+                "result": result,
+                "task_id": task_payload.get('task_id')
+            }
+            
+        except Exception as e:
+            logger.error(f"{self.agent_name} error: {str(e)}")
+            return {
+                "status": "error",
+                "agent": self.agent_name,
+                "error": str(e),
+                "task_id": task_payload.get('task_id')
+            }
+    
+    def _prepare_prompt_with_browsing(self, task_payload: Dict[str, Any]) -> str:
+        """Prepare prompt with browsing results if available."""
         user_message = task_payload.get('user_message', '')
         conversation_history = task_payload.get('conversation_history', [])
+        website_browsing = task_payload.get('website_browsing_results', '')
         
         prompt = f"User message: {user_message}\n\n"
         
-        # Check if user provided URLs or website references
-        urls = self._extract_urls(user_message)
-        
-        if urls:
-            prompt += "🌐 BROWSING WEBSITES NOW...\n\n"
-            import asyncio
-            for url in urls[:2]:  # Limit to 2 URLs
-                try:
-                    website_content = asyncio.run(self.browse_website(url))
-                    prompt += f"{website_content}\n\n"
-                except Exception as e:
-                    logger.error(f"Error browsing in sync context: {str(e)}")
-                    prompt += f"❌ Could not browse {url}\n\n"
+        # Add website browsing results if available
+        if website_browsing:
+            prompt += f"🌐 WEBSITE BROWSING RESULTS:\n{website_browsing}\n\n"
+            prompt += "✅ Use the actual website content above to personalize your response and create relevant marketing content.\n\n"
         
         if conversation_history:
             prompt += "Previous conversation:\n"
