@@ -89,14 +89,20 @@ When you have sufficient information to create a campaign, respond with JSON:
     "additional_context": "..."
   }
 }
-}
 
-If you need more information, respond with:
+If you need MORE information (only for full campaigns), respond with:
 {
   "ready_to_plan": false,
-  "response": "Your conversational response here",
-  "questions": ["Question 1", "Question 2"]
+  "response": "Your natural, helpful response here",
+  "questions": ["One precise question"]
 }
+
+For SIMPLE requests (posts, ads, content pieces):
+- Just respond conversationally
+- Create the content directly
+- Ask 1 short question if absolutely needed
+
+**Remember:** You're a smart marketing expert who understands context, thinks proactively, and communicates naturally. Be helpful, not robotic. Create value, not forms.
 """
 
 class ConversationalAgent(BaseAgent):
