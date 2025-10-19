@@ -455,6 +455,108 @@ async def save_settings(data: Dict[str, Any], user_id: str = "default_user"):
         logger.error(f"Error saving settings: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Social Media Publishing Endpoints ====================
+
+@api_router.post("/publish")
+async def publish_content(data: Dict[str, Any]):
+    """
+    Publish content to social media platforms.
+    
+    Expected data:
+    {
+        "platforms": ["facebook", "instagram"],
+        "content": {
+            "message": "Post text",
+            "image_url": "https://...",
+            "link": "https://..."
+        },
+        "user_id": "default_user"
+    }
+    """
+    try:
+        platforms = data.get("platforms", [])
+        content = data.get("content", {})
+        user_id = data.get("user_id", "default_user")
+        
+        if not platforms:
+            raise HTTPException(status_code=400, detail="No platforms specified")
+        
+        # Get credentials from settings
+        settings = await db.settings.find_one({"user_id": user_id})
+        
+        if not settings:
+            raise HTTPException(
+                status_code=404,
+                detail="No credentials found. Please configure social media credentials in settings."
+            )
+        
+        credentials = settings.get("credentials", {})
+        
+        # Validate required credentials based on platforms
+        if "facebook" in platforms:
+            if not credentials.get("facebook_page_id") or not credentials.get("facebook_access_token"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Facebook credentials not configured. Please add Facebook Page ID and Access Token in settings."
+                )
+        
+        if "instagram" in platforms:
+            if not credentials.get("instagram_account_id"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Instagram credentials not configured. Please add Instagram Business Account ID in settings."
+                )
+        
+        # Publish to platforms
+        results = await social_media_service.publish_to_multiple_platforms(
+            platforms=platforms,
+            credentials=credentials,
+            content=content
+        )
+        
+        # Store publishing record in database
+        publishing_record = {
+            "user_id": user_id,
+            "platforms": platforms,
+            "content": content,
+            "results": results,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+        await db.published_content.insert_one(publishing_record)
+        
+        return {
+            "status": "success",
+            "results": results,
+            "timestamp": publishing_record["timestamp"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error publishing content: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/publish/history")
+async def get_publish_history(
+    user_id: str = "default_user",
+    limit: int = Query(default=20, le=100)
+):
+    """Get publishing history for a user."""
+    try:
+        history = await db.published_content.find(
+            {"user_id": user_id},
+            {"_id": 0}
+        ).sort("timestamp", -1).limit(limit).to_list(limit)
+        
+        return {
+            "history": history,
+            "count": len(history)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching publish history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Voice Endpoints ====================
 
 @api_router.post("/voice/speech-to-text")
