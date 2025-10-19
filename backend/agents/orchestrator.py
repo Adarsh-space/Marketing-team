@@ -36,7 +36,8 @@ class AgentOrchestrator:
             "SEOAgent": SEOAgent(),
             "PPCAgent": PPCAgent(),
             "AnalyticsAgent": AnalyticsAgent(),
-            "ReportingAgent": ReportingAgent()
+            "ReportingAgent": ReportingAgent(),
+            "ImageGenerationAgent": ImageGenerationAgent()
         }
         logger.info("AgentOrchestrator initialized with all agents")
     
