@@ -232,22 +232,25 @@ const VoiceAssistant = () => {
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
               className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 text-sm backdrop-blur-lg hover:bg-white/20 transition-all"
+              style={{
+                colorScheme: 'dark'
+              }}
             >
-              <option value="en-US">🇺🇸 English (US)</option>
-              <option value="en-GB">🇬🇧 English (UK)</option>
-              <option value="es-ES">🇪🇸 Spanish</option>
-              <option value="fr-FR">🇫🇷 French</option>
-              <option value="de-DE">🇩🇪 German</option>
-              <option value="it-IT">🇮🇹 Italian</option>
-              <option value="pt-PT">🇵🇹 Portuguese</option>
-              <option value="zh-CN">🇨🇳 Chinese</option>
-              <option value="ja-JP">🇯🇵 Japanese</option>
-              <option value="ko-KR">🇰🇷 Korean</option>
-              <option value="hi-IN">🇮🇳 Hindi</option>
-              <option value="ar-SA">🇸🇦 Arabic</option>
-              <option value="te-IN">🇮🇳 Telugu</option>
-              <option value="ta-IN">🇮🇳 Tamil</option>
-              <option value="kn-IN">🇮🇳 Kannada</option>
+              <option value="en-US" className="bg-slate-800 text-white">🇺🇸 English (US)</option>
+              <option value="en-GB" className="bg-slate-800 text-white">🇬🇧 English (UK)</option>
+              <option value="es-ES" className="bg-slate-800 text-white">🇪🇸 Spanish</option>
+              <option value="fr-FR" className="bg-slate-800 text-white">🇫🇷 French</option>
+              <option value="de-DE" className="bg-slate-800 text-white">🇩🇪 German</option>
+              <option value="it-IT" className="bg-slate-800 text-white">🇮🇹 Italian</option>
+              <option value="pt-PT" className="bg-slate-800 text-white">🇵🇹 Portuguese</option>
+              <option value="zh-CN" className="bg-slate-800 text-white">🇨🇳 Chinese</option>
+              <option value="ja-JP" className="bg-slate-800 text-white">🇯🇵 Japanese</option>
+              <option value="ko-KR" className="bg-slate-800 text-white">🇰🇷 Korean</option>
+              <option value="hi-IN" className="bg-slate-800 text-white">🇮🇳 Hindi</option>
+              <option value="ar-SA" className="bg-slate-800 text-white">🇸🇦 Arabic</option>
+              <option value="te-IN" className="bg-slate-800 text-white">🇮🇳 Telugu</option>
+              <option value="ta-IN" className="bg-slate-800 text-white">🇮🇳 Tamil</option>
+              <option value="kn-IN" className="bg-slate-800 text-white">🇮🇳 Kannada</option>
               <option value="ml-IN">🇮🇳 Malayalam</option>
               <option value="mr-IN">🇮🇳 Marathi</option>
               <option value="bn-IN">🇮🇳 Bengali</option>
