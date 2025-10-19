@@ -197,16 +197,19 @@ Total content length: {len(text)} characters
         
         prompt = f"User message: {user_message}\n\n"
         
-        # Check if user wants to browse a website
-        if 'http://' in user_message.lower() or 'https://' in user_message.lower() or 'check website' in user_message.lower() or 'visit' in user_message.lower():
-            # Extract URL if present
-            words = user_message.split()
-            for word in words:
-                if word.startswith('http://') or word.startswith('https://'):
-                    import asyncio
-                    website_content = asyncio.run(self.browse_website(word))
-                    prompt += f"\nWebsite content:\n{website_content}\n\n"
-                    break
+        # Check if user provided URLs or website references
+        urls = self._extract_urls(user_message)
+        
+        if urls:
+            prompt += "🌐 BROWSING WEBSITES NOW...\n\n"
+            import asyncio
+            for url in urls[:2]:  # Limit to 2 URLs
+                try:
+                    website_content = asyncio.run(self.browse_website(url))
+                    prompt += f"{website_content}\n\n"
+                except Exception as e:
+                    logger.error(f"Error browsing in sync context: {str(e)}")
+                    prompt += f"❌ Could not browse {url}\n\n"
         
         if conversation_history:
             prompt += "Previous conversation:\n"
