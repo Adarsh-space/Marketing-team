@@ -1,0 +1,200 @@
+[
+  {
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Health check successful - Status: healthy",
+    "details": {
+      "agents_count": 10
+    },
+    "timestamp": "2025-10-19T09:27:24.663873"
+  },
+  {
+    "endpoint": "/",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Root endpoint working",
+    "details": {
+      "agents_available": [
+        "ConversationalAgent",
+        "PlanningAgent",
+        "MarketResearchAgent",
+        "ContentAgent",
+        "EmailAgent",
+        "SocialMediaAgent",
+        "SEOAgent",
+        "PPCAgent",
+        "AnalyticsAgent",
+        "ReportingAgent"
+      ]
+    },
+    "timestamp": "2025-10-19T09:27:24.674747"
+  },
+  {
+    "endpoint": "/chat",
+    "method": "POST",
+    "status": "PASS",
+    "message": "Chat endpoint working",
+    "details": {
+      "conversation_id": "7b446146-46f3-4042-9dc5-90e5010288d3",
+      "type": "conversation"
+    },
+    "timestamp": "2025-10-19T09:27:27.100589"
+  },
+  {
+    "endpoint": "/conversations/7b446146-46f3-4042-9dc5-90e5010288d3",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Conversation retrieval working",
+    "details": {
+      "conversation_data": "present"
+    },
+    "timestamp": "2025-10-19T09:27:27.150209"
+  },
+  {
+    "endpoint": "/campaigns",
+    "method": "POST",
+    "status": "FAIL",
+    "message": "Campaign creation failed: 500",
+    "details": {
+      "response": "Internal Server Error"
+    },
+    "timestamp": "2025-10-19T09:27:34.649346"
+  },
+  {
+    "endpoint": "/campaigns",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Campaign listing working - Found 2 campaigns",
+    "details": {},
+    "timestamp": "2025-10-19T09:27:34.733006"
+  },
+  {
+    "endpoint": "/agent-chat",
+    "method": "POST",
+    "status": "FAIL",
+    "message": "Agent content_agent not found",
+    "details": {},
+    "timestamp": "2025-10-19T09:27:34.743453"
+  },
+  {
+    "endpoint": "/agent-chat",
+    "method": "POST",
+    "status": "FAIL",
+    "message": "Agent planning_agent not found",
+    "details": {},
+    "timestamp": "2025-10-19T09:27:34.751063"
+  },
+  {
+    "endpoint": "/agent-chat",
+    "method": "POST",
+    "status": "FAIL",
+    "message": "Agent market_research_agent not found",
+    "details": {},
+    "timestamp": "2025-10-19T09:27:34.761274"
+  },
+  {
+    "endpoint": "/settings",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Settings retrieval working",
+    "details": {
+      "has_credentials": true
+    },
+    "timestamp": "2025-10-19T09:27:34.809895"
+  },
+  {
+    "endpoint": "/settings",
+    "method": "POST",
+    "status": "PASS",
+    "message": "Settings save working",
+    "details": {
+      "message": "Settings saved"
+    },
+    "timestamp": "2025-10-19T09:27:34.857526"
+  },
+  {
+    "endpoint": "/publish",
+    "method": "POST",
+    "status": "PASS",
+    "message": "Publishing endpoint working (credentials may be invalid)",
+    "details": {
+      "platforms": [
+        "facebook",
+        "instagram"
+      ],
+      "results": {
+        "facebook": {
+          "status": "error",
+          "message": "Failed to post to Facebook: Invalid OAuth access token - Cannot parse access token"
+        },
+        "instagram": {
+          "status": "error",
+          "message": "Failed to create container: Invalid OAuth access token - Cannot parse access token"
+        }
+      }
+    },
+    "timestamp": "2025-10-19T09:27:35.180162"
+  },
+  {
+    "endpoint": "/publish/history",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Publishing history working - 1 records found",
+    "details": {},
+    "timestamp": "2025-10-19T09:27:35.188737"
+  },
+  {
+    "endpoint": "/hubspot/status",
+    "method": "GET",
+    "status": "PASS",
+    "message": "HubSpot status working - Connected: False",
+    "details": {
+      "connection_details": {
+        "connected": false
+      }
+    },
+    "timestamp": "2025-10-19T09:27:35.199675"
+  },
+  {
+    "endpoint": "/oauth/hubspot/authorize",
+    "method": "GET",
+    "status": "PASS",
+    "message": "HubSpot OAuth URL generation working",
+    "details": {
+      "url_contains_hubspot": true
+    },
+    "timestamp": "2025-10-19T09:27:35.252922"
+  },
+  {
+    "endpoint": "/voice/languages",
+    "method": "GET",
+    "status": "PASS",
+    "message": "Voice languages working - 15 languages, 6 voices",
+    "details": {
+      "languages_count": 15,
+      "voices_count": 6
+    },
+    "timestamp": "2025-10-19T09:27:35.262434"
+  },
+  {
+    "endpoint": "/voice/text-to-speech",
+    "method": "POST",
+    "status": "FAIL",
+    "message": "Text-to-speech failed: 500",
+    "details": {
+      "response": "{\"detail\":\"Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}\"}"
+    },
+    "timestamp": "2025-10-19T09:27:39.040517"
+  },
+  {
+    "endpoint": "/voice/speech-to-text",
+    "method": "POST",
+    "status": "PASS",
+    "message": "Speech-to-text endpoint exists (requires audio file - not tested)",
+    "details": {
+      "note": "Endpoint requires multipart/form-data with audio file"
+    },
+    "timestamp": "2025-10-19T09:27:39.040547"
+  }
+]
