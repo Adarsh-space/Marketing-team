@@ -116,19 +116,79 @@ class ConversationalAgent(BaseAgent):
         )
     
     async def browse_website(self, url: str) -> str:
-        """Browse a website and extract content."""
+        """Browse a website and extract content using web scraping."""
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(url, follow_redirects=True)
+            # Ensure URL has protocol
+            if not url.startswith('http'):
+                url = 'https://' + url
+            
+            logger.info(f"Browsing website: {url}")
+            
+            async with httpx.AsyncClient(
+                timeout=15.0,
+                follow_redirects=True,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            ) as client:
+                response = await client.get(url)
+                
                 if response.status_code == 200:
-                    # Simple text extraction (first 2000 chars)
-                    text = response.text[:2000]
-                    return f"Website {url} content preview: {text}"
+                    # Extract text content
+                    html = response.text
+                    
+                    # Simple text extraction (remove HTML tags)
+                    import re
+                    # Remove script and style elements
+                    html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                    html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL | re.IGNORECASE)
+                    # Remove HTML tags
+                    text = re.sub(r'<[^>]+>', ' ', html)
+                    # Clean up whitespace
+                    text = re.sub(r'\s+', ' ', text).strip()
+                    
+                    # Get first 3000 chars
+                    text_preview = text[:3000]
+                    
+                    logger.info(f"Successfully browsed {url}, extracted {len(text_preview)} chars")
+                    
+                    return f"""
+✅ Successfully browsed: {url}
+
+Content Preview:
+{text_preview}
+
+Total content length: {len(text)} characters
+"""
                 else:
-                    return f"Failed to access {url}: Status {response.status_code}"
+                    error_msg = f"Failed to access {url}: HTTP {response.status_code}"
+                    logger.warning(error_msg)
+                    return f"❌ {error_msg}"
+                    
+        except httpx.TimeoutException:
+            error_msg = f"Timeout accessing {url}"
+            logger.error(error_msg)
+            return f"❌ {error_msg} - Website took too long to respond"
         except Exception as e:
-            logger.error(f"Error browsing {url}: {str(e)}")
-            return f"Could not access {url}: {str(e)}"
+            error_msg = f"Error browsing {url}: {str(e)}"
+            logger.error(error_msg)
+            return f"❌ {error_msg}"
+    
+    def _extract_urls(self, text: str) -> list:
+        """Extract URLs from text."""
+        import re
+        # Pattern to match URLs and domain names
+        url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
+        domain_pattern = r'\b(?:www\.)?[a-zA-Z0-9-]+\.[a-zA-Z]{2,}(?:/[^\s]*)?\b'
+        
+        urls = re.findall(url_pattern, text)
+        
+        # Also find domain names and convert to URLs
+        if not urls:
+            domains = re.findall(domain_pattern, text)
+            urls = [d if d.startswith('http') else f'https://{d}' for d in domains]
+        
+        return urls
     
     def _prepare_prompt(self, task_payload: Dict[str, Any]) -> str:
         """Prepare prompt for conversational interaction."""
