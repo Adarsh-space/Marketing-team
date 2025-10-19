@@ -4,6 +4,7 @@ import HomePage from "@/pages/HomePage";
 import CampaignPage from "@/pages/CampaignPage";
 import DashboardPage from "@/pages/DashboardPage";
 import VoiceAssistant from "@/pages/VoiceAssistant";
+import VoiceAssistantWithAgents from "@/pages/VoiceAssistantWithAgents";
 import SettingsPage from "@/pages/SettingsPage";
 import "@/App.css";
 
@@ -13,7 +14,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/voice" element={<VoiceAssistant />} />
+          <Route path="/voice" element={<VoiceAssistantWithAgents />} />
+          <Route path="/voice-simple" element={<VoiceAssistant />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/campaign/:campaignId" element={<CampaignPage />} />
           <Route path="/settings" element={<SettingsPage />} />
