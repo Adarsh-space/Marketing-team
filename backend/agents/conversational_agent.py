@@ -1,8 +1,12 @@
 from .base_agent import BaseAgent
 from typing import Dict, Any
 import json
+import httpx
+import logging
 
-CONVERSATIONAL_SYSTEM_PROMPT = """You are the Conversational Interface Agent for an AI marketing automation platform.
+logger = logging.getLogger(__name__)
+
+CONVERSATIONAL_SYSTEM_PROMPT = """You are the Conversational Interface Agent for an AI marketing automation platform with web browsing capability.
 
 Your responsibilities:
 1. Engage users in natural, friendly conversation to understand their marketing goals
@@ -10,6 +14,13 @@ Your responsibilities:
 3. Interpret user requests and extract structured campaign requirements
 4. Provide updates on campaign progress in clear, non-technical language
 5. Handle user feedback and questions about campaigns
+6. **Browse websites and check online information when requested**
+
+**Web Browsing Capability:**
+When user asks you to check a website or get information from the internet:
+- Tell them you're checking the website
+- Use the browse_web tool in your payload
+- Analyze the website content and provide insights
 
 When gathering campaign information, you need to collect:
 - Product/Service details
@@ -45,7 +56,7 @@ If you need more information, respond with:
 """
 
 class ConversationalAgent(BaseAgent):
-    """Agent responsible for user interaction and requirement gathering."""
+    """Agent responsible for user interaction and requirement gathering with web browsing."""
     
     def __init__(self):
         super().__init__(
@@ -54,6 +65,21 @@ class ConversationalAgent(BaseAgent):
             model="gpt-4o"
         )
     
+    async def browse_website(self, url: str) -> str:
+        """Browse a website and extract content."""
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(url, follow_redirects=True)
+                if response.status_code == 200:
+                    # Simple text extraction (first 2000 chars)
+                    text = response.text[:2000]
+                    return f"Website {url} content preview: {text}"
+                else:
+                    return f"Failed to access {url}: Status {response.status_code}"
+        except Exception as e:
+            logger.error(f"Error browsing {url}: {str(e)}")
+            return f"Could not access {url}: {str(e)}"
+    
     def _prepare_prompt(self, task_payload: Dict[str, Any]) -> str:
         """Prepare prompt for conversational interaction."""
         user_message = task_payload.get('user_message', '')
@@ -61,9 +87,20 @@ class ConversationalAgent(BaseAgent):
         
         prompt = f"User message: {user_message}\n\n"
         
+        # Check if user wants to browse a website
+        if 'http://' in user_message.lower() or 'https://' in user_message.lower() or 'check website' in user_message.lower() or 'visit' in user_message.lower():
+            # Extract URL if present
+            words = user_message.split()
+            for word in words:
+                if word.startswith('http://') or word.startswith('https://'):
+                    import asyncio
+                    website_content = asyncio.run(self.browse_website(word))
+                    prompt += f"\nWebsite content:\n{website_content}\n\n"
+                    break
+        
         if conversation_history:
             prompt += "Previous conversation:\n"
-            for msg in conversation_history[-5:]:  # Last 5 messages for context
+            for msg in conversation_history[-5:]:
                 role = msg.get('role', 'user')
                 content = msg.get('content', '')
                 prompt += f"{role}: {content}\n"
@@ -73,11 +110,9 @@ class ConversationalAgent(BaseAgent):
     def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
         """Parse conversational response."""
         try:
-            # Try to parse as JSON first
             parsed = json.loads(response)
             return parsed
         except json.JSONDecodeError:
-            # If not valid JSON, return as text response
             return {
                 "ready_to_plan": False,
                 "response": response,
