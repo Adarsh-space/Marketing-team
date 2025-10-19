@@ -90,6 +90,30 @@ class AgentOrchestrator:
             
             result = response.get("result", {})
             
+            # Check if user wants image generation
+            if result.get("image_request"):
+                image_context = result.get("image_context", {})
+                image_agent = self.agents.get("ImageGenerationAgent")
+                
+                if image_agent:
+                    logger.info("User requested image generation, creating image...")
+                    # Get conversation context for brand info
+                    brand_info = ""
+                    for msg in conversation.get("messages", [])[-5:]:
+                        if "website" in msg.get("content", "").lower():
+                            brand_info += msg.get("content", "") + " "
+                    
+                    image_context["brand_info"] = brand_info
+                    image_result = await image_agent.generate_image_from_context(image_context)
+                    
+                    return {
+                        "type": "image_generated",
+                        "message": result.get("response", "Here's your generated image!"),
+                        "image_base64": image_result.get("image_base64"),
+                        "prompt_used": image_result.get("prompt_used"),
+                        "ready_to_plan": False
+                    }
+            
             # Check if ready to create campaign
             if result.get("ready_to_plan"):
                 campaign_brief = result.get("campaign_brief", {})
