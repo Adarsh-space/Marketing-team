@@ -363,6 +363,40 @@ async def get_dashboard():
         logger.error(f"Error fetching dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Individual Agent Chat ====================
+
+@api_router.post("/agent-chat")
+async def agent_chat(data: Dict[str, Any]):
+    """
+    Chat with individual agents directly.
+    """
+    try:
+        agent_id = data.get("agent_id")
+        message = data.get("message")
+        
+        # Get the specific agent
+        agent = orchestrator.agents.get(agent_id)
+        
+        if not agent:
+            raise HTTPException(status_code=404, detail="Agent not found")
+        
+        # Execute agent with message
+        result = await agent.execute({
+            "task_id": "direct_chat",
+            "user_message": message,
+            "messages": data.get("messages", [])
+        })
+        
+        return {
+            "response": result.get("result", {}).get("response", result.get("result", ""))
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Agent chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Settings Endpoints ====================
 
 @api_router.get("/settings")
