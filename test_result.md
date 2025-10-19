@@ -316,14 +316,14 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Implement auto-publishing endpoint with Facebook/Instagram integration"
-    - "Complete agent communication visualization panel"
-    - "Test all backend endpoints"
+    - "Test auto-publishing endpoint with Facebook/Instagram"
+    - "Test agent communication visualization"
+    - "Test all backend endpoints comprehensively"
     - "Test all frontend pages"
   stuck_tasks: []
-  test_all: false
+  test_all: true
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Starting comprehensive implementation of pending features. Will implement auto-publishing, complete visualization panel, then test everything systematically."
+    message: "Completed implementation of auto-publishing endpoint (Facebook/Instagram) and agent communication visualization. Ready for comprehensive backend testing."
