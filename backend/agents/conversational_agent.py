@@ -137,7 +137,7 @@ class ConversationalAgent(BaseAgent):
                 timeout=15.0,
                 follow_redirects=True,
                 headers={
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                 }
             ) as client:
                 response = await client.get(url)
@@ -157,31 +157,33 @@ class ConversationalAgent(BaseAgent):
                     text = re.sub(r'\s+', ' ', text).strip()
                     
                     # Get first 3000 chars
-                    text_preview = text[:3000]
+                    text_preview = text[:3000] if text else "No text content found"
                     
                     logger.info(f"Successfully browsed {url}, extracted {len(text_preview)} chars")
                     
                     return f"""
-✅ Successfully browsed: {url}
+✅ I've checked {url}!
 
-Content Preview:
+Here's what I found:
 {text_preview}
-
-Total content length: {len(text)} characters
 """
                 else:
-                    error_msg = f"Failed to access {url}: HTTP {response.status_code}"
-                    logger.warning(error_msg)
-                    return f"❌ {error_msg}"
+                    error_msg = f"Website returned HTTP {response.status_code}"
+                    logger.warning(f"{error_msg} for {url}")
+                    return f"⚠️ {error_msg}"
                     
-        except httpx.TimeoutException:
-            error_msg = f"Timeout accessing {url}"
-            logger.error(error_msg)
-            return f"❌ {error_msg} - Website took too long to respond"
+        except httpx.TimeoutException as e:
+            error_msg = f"Website took too long to respond"
+            logger.error(f"{error_msg}: {url} - {str(e)}")
+            return f"⚠️ {error_msg}"
+        except httpx.HTTPError as e:
+            error_msg = f"Network error accessing website"
+            logger.error(f"{error_msg}: {url} - {str(e)}")
+            return f"⚠️ {error_msg}: {str(e)}"
         except Exception as e:
-            error_msg = f"Error browsing {url}: {str(e)}"
-            logger.error(error_msg)
-            return f"❌ {error_msg}"
+            error_msg = f"Could not access website"
+            logger.error(f"{error_msg}: {url} - {type(e).__name__}: {str(e)}")
+            return f"⚠️ {error_msg}: {type(e).__name__}"
     
     def _extract_urls(self, text: str) -> list:
         """Extract URLs from text."""
