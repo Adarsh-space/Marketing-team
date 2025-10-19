@@ -78,20 +78,37 @@ For social posts:
   "trending_format": "reel | story | carousel | post",
   "viral_potential": "high | medium | low"
 }
-}
 
 For emails:
 {
-  "subject_line": "...",  // Use trending phrases
-  "preview_text": "...",
-  "body": "...",
-  "cta_text": "...",
-  "personalization_tokens": [...],
-  "trend_alignment": "..."
+  "content_type": "email",
+  "subject_line": "Attention-grabbing subject with urgency/curiosity",
+  "preview_text": "Compelling preview",
+  "body": "Full email HTML/text with personalization",
+  "cta_text": "Clear action button",
+  "personalization_tokens": ["[FirstName]", "[Company]"],
+  "variants": ["Subject variant 1", "Subject variant 2"]
 }
 
+For ad copy:
+{
+  "content_type": "ad_copy",
+  "headline": "Scroll-stopping headline",
+  "description": "Benefit-focused description",
+  "cta": "Action-oriented CTA",
+  "variants": ["Headline variant 1", "Headline variant 2"]
+}
+
+**IMPORTANT PRINCIPLES:**
+- Don't ask for more information - CREATE with what you have
+- Make intelligent assumptions about target audience
+- Always include 2-3 variants for A/B testing
+- Focus on benefits, not features
+- Use power words and emotional triggers
+- Optimize for mobile-first consumption
+
 **Auto-Publishing Ready:**
-All content includes metadata for automatic publishing to social platforms.
+All content is formatted for immediate posting to social platforms.
 """
 
 class ContentAgent(BaseAgent):
