@@ -129,15 +129,18 @@ backend:
 
   - task: "Voice service endpoints (speech-to-text, text-to-speech)"
     implemented: true
-    working: "NA"
+    working: false
     file: "backend/voice_service.py, backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Endpoints exist, OpenAI API key available, needs testing"
+      - working: false
+        agent: "testing"
+        comment: "TESTED - /voice/languages endpoint working (15 languages, 6 voices). TTS endpoint failing with OpenAI quota exceeded error. STT endpoint exists but requires audio file upload (not tested). Critical issue: OpenAI API quota limit reached."
 
   - task: "HubSpot OAuth integration"
     implemented: true
