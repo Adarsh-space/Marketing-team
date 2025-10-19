@@ -209,15 +209,16 @@ const VoiceAssistantWithAgents = () => {
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value)}
               className="bg-white/10 text-white border border-white/20 rounded-lg px-3 py-1.5 text-sm backdrop-blur-lg"
+              style={{colorScheme: 'dark'}}
             >
-              <option value="en-US">🇺🇸 English</option>
-              <option value="te-IN">🇮🇳 Telugu</option>
-              <option value="ta-IN">🇮🇳 Tamil</option>
-              <option value="kn-IN">🇮🇳 Kannada</option>
-              <option value="hi-IN">🇮🇳 Hindi</option>
-              <option value="es-ES">🇪🇸 Spanish</option>
-              <option value="fr-FR">🇫🇷 French</option>
-              <option value="de-DE">🇩🇪 German</option>
+              <option value="en-US" className="bg-slate-800 text-white">🇺🇸 English</option>
+              <option value="te-IN" className="bg-slate-800 text-white">🇮🇳 Telugu</option>
+              <option value="ta-IN" className="bg-slate-800 text-white">🇮🇳 Tamil</option>
+              <option value="kn-IN" className="bg-slate-800 text-white">🇮🇳 Kannada</option>
+              <option value="hi-IN" className="bg-slate-800 text-white">🇮🇳 Hindi</option>
+              <option value="es-ES" className="bg-slate-800 text-white">🇪🇸 Spanish</option>
+              <option value="fr-FR" className="bg-slate-800 text-white">🇫🇷 French</option>
+              <option value="de-DE" className="bg-slate-800 text-white">🇩🇪 German</option>
             </select>
           </div>
         </div>
