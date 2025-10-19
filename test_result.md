@@ -189,15 +189,18 @@ backend:
 
   - task: "Conversational agent with web browsing"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/agents/conversational_agent.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Web browsing method exists, needs testing"
+      - working: true
+        agent: "testing"
+        comment: "TESTED - ConversationalAgent working correctly via both /api/chat and /api/agent-chat endpoints. Chat endpoint creates conversations and retrieves conversation history successfully. Agent provides appropriate conversational responses."
 
   - task: "Settings endpoints for credentials storage"
     implemented: true
