@@ -14,6 +14,7 @@ from .seo_agent import SEOAgent
 from .ppc_agent import PPCAgent
 from .analytics_agent import AnalyticsAgent
 from .reporting_agent import ReportingAgent
+from .image_generation_agent import ImageGenerationAgent
 
 logger = logging.getLogger(__name__)
 
