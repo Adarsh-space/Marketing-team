@@ -244,17 +244,37 @@ class AgentOrchestrator:
             
             logger.info(f"Campaign {campaign_id} execution completed")
             
+            # Return clean data without MongoDB ObjectIds
+            # Convert any complex objects to serializable format
+            clean_plan = self._clean_for_json(plan)
+            clean_results = self._clean_for_json(task_results)
+            
             return {
                 "campaign_id": campaign_id,
                 "status": "completed",
-                "plan": plan,
-                "results": task_results
+                "plan": clean_plan,
+                "results": clean_results
             }
             
         except Exception as e:
             logger.error(f"Error executing campaign: {str(e)}")
             await self._update_campaign_status(campaign_id, "failed")
             raise
+    
+    def _clean_for_json(self, data: Any) -> Any:
+        """
+        Recursively clean data for JSON serialization.
+        Removes MongoDB ObjectIds and converts non-serializable types.
+        """
+        if isinstance(data, dict):
+            return {k: self._clean_for_json(v) for k, v in data.items() if k != '_id'}
+        elif isinstance(data, list):
+            return [self._clean_for_json(item) for item in data]
+        elif hasattr(data, '__dict__'):
+            # Handle objects with __dict__
+            return str(data)
+        else:
+            return data
     
     async def _update_campaign_status(self, campaign_id: str, status: str):
         """Update campaign status in database."""
