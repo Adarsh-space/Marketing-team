@@ -27,9 +27,10 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# Initialize orchestrator and voice service
+# Initialize orchestrator, voice service, and social media service
 orchestrator = AgentOrchestrator(db)
 voice_service = VoiceService()
+social_media_service = SocialMediaService()
 
 # Create the main app
 app = FastAPI(
