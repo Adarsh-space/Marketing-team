@@ -138,7 +138,18 @@ class AgentOrchestrator:
             await self.db.campaigns.insert_one(campaign)
             logger.info(f"Created campaign: {campaign_id}")
             
-            return campaign
+            # Return campaign without MongoDB _id
+            return {
+                "campaign_id": campaign_id,
+                "conversation_id": conversation_id,
+                "brief": campaign_brief,
+                "status": "planning",
+                "created_at": campaign["created_at"],
+                "updated_at": campaign["updated_at"],
+                "plan": None,
+                "tasks": [],
+                "results": {}
+            }
             
         except Exception as e:
             logger.error(f"Error creating campaign: {str(e)}")
