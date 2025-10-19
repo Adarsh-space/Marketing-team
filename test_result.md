@@ -204,15 +204,18 @@ backend:
 
   - task: "Settings endpoints for credentials storage"
     implemented: true
-    working: "NA"
+    working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "GET and POST /api/settings endpoints exist"
+      - working: true
+        agent: "testing"
+        comment: "TESTED - Settings endpoints working perfectly. GET /api/settings retrieves user settings with credentials. POST /api/settings saves credentials successfully. Credential storage and retrieval functioning correctly."
 
   - task: "Auto-publishing endpoint for social media"
     implemented: true
