@@ -152,15 +152,27 @@ const VoiceAssistantWithAgents = () => {
         role: "assistant", 
         content: aiResponse,
         image: imageData,
-        prompt: promptUsed
+        prompt: promptUsed,
+        timestamp: Date.now() // Add timestamp for unique keys
       };
       
-      setMessages(prev => [...prev, assistantMessage]);
+      console.log('Adding assistant message to state:', {
+        hasImage: !!assistantMessage.image,
+        imageLength: assistantMessage.image?.length,
+        content: assistantMessage.content.substring(0, 50)
+      });
+      
+      setMessages(prev => {
+        const newMessages = [...prev, assistantMessage];
+        console.log('Updated messages array length:', newMessages.length);
+        console.log('Last message has image:', !!newMessages[newMessages.length - 1].image);
+        return newMessages;
+      });
       
       // Log image generation if it happened
       if (imageData) {
-        addAgentLog('ImageGenerationAgent', 'COMPLETE', `Generated image using DALL-E`);
-        toast.success('🎨 Image generated!');
+        addAgentLog('ImageGenerationAgent', 'COMPLETE', `Generated image using DALL-E (${imageData.length} chars)`);
+        toast.success('🎨 Image generated successfully!');
       }
       
       speakText(aiResponse);
