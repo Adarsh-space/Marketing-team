@@ -364,3 +364,5 @@ agent_communication:
     message: "BACKEND TESTING IN PROGRESS - Initial results: 13/18 tests passing (72.2% success rate). Critical issues found: 1) Campaign creation failing with recursion error, 2) Agent chat endpoint working but test used wrong agent names, 3) OpenAI quota exceeded for TTS. Auto-publishing endpoint working correctly with proper error handling for invalid credentials."
   - agent: "testing"
     message: "BACKEND TESTING COMPLETED - Final results: Most endpoints working correctly. ✅ WORKING: Health, Chat, Agent Chat (all 10 agents), Settings, Auto-publishing, HubSpot OAuth, Voice languages. ❌ CRITICAL ISSUES: 1) Campaign creation failing with RecursionError (FastAPI JSON serialization issue), 2) OpenAI TTS quota exceeded. Campaign creation needs immediate attention - appears to be circular reference in orchestrator response data."
+  - agent: "main"
+    message: "USER FEEDBACK: Image generation returning empty response despite backend logs showing success. Now using Emergent LLM key for all integrations. Fixing: 1) Image generation response issue, 2) Campaign recursion already addressed with _clean_for_json, 3) All pending features."
