@@ -404,3 +404,5 @@ agent_communication:
     message: "USER FEEDBACK: Image generation returning empty response despite backend logs showing success. Now using Emergent LLM key for all integrations. Fixing: 1) Image generation response issue, 2) Campaign recursion already addressed with _clean_for_json, 3) All pending features."
   - agent: "main"
     message: "ALL ISSUES RESOLVED! ✅ Image generation now working perfectly - generates actual images, not JSON text. ✅ Agent responses are natural (no JSON symbols shown to user). ✅ All OpenAI integrations using Emergent LLM key. ✅ Campaign recursion error fixed. System fully operational!"
+  - agent: "main"
+    message: "USER FEEDBACK: Images not displaying in frontend UI. Investigation showed backend returns image_base64 correctly but frontend code doesn't extract/display it. Now implementing image rendering in VoiceAssistantWithAgents.js to display base64 images in chat messages."
