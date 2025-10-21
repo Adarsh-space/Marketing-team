@@ -7,6 +7,7 @@ import VoiceAssistant from "@/pages/VoiceAssistant";
 import VoiceAssistantWithAgents from "@/pages/VoiceAssistantWithAgents";
 import SettingsPage from "@/pages/SettingsPage";
 import AgentChatPage from "@/pages/AgentChatPage";
+import ImageTestPage from "@/pages/ImageTestPage";
 import "@/App.css";
 
 function App() {
