@@ -116,6 +116,14 @@ const VoiceAssistantWithAgents = () => {
       const imageData = chatResponse.data.image_base64;
       const promptUsed = chatResponse.data.prompt_used;
       
+      // Debug logging
+      console.log('Chat Response:', {
+        hasImage: !!imageData,
+        imageLength: imageData ? imageData.length : 0,
+        prompt: promptUsed,
+        messageType: chatResponse.data.type
+      });
+      
       if (!conversationId) {
         setConversationId(chatResponse.data.conversation_id);
       }
