@@ -288,19 +288,29 @@ class VectorMemoryService:
         query: str,
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Fallback text search when vector search is not available."""
+        """Fallback text search when vector search is not available - searches ALL user memories."""
         try:
-            # Simple text matching
-            filter_query["content"] = {"$regex": query, "$options": "i"}
-            results = await collection.find(filter_query).limit(limit).to_list(limit)
-            
-            # Remove _id and embedding for cleaner response
-            for result in results:
-                result.pop("_id", None)
-                result.pop("embedding", None)
-                result["score"] = 0.5  # Default score for text match
-            
-            return results
+            # Remove regex filter, just get ALL user's memories
+            user_id = filter_query.get("user_id")
+            if user_id:
+                # Get ALL memories for this user, sorted by most recent
+                results = await collection.find(
+                    {"user_id": user_id}
+                ).sort("created_at", -1).limit(limit * 3).to_list(limit * 3)
+                
+                # Remove _id and embedding for cleaner response
+                clean_results = []
+                for result in results:
+                    result.pop("_id", None)
+                    result.pop("embedding", None)
+                    result["score"] = 0.7  # Give decent score for recency
+                    clean_results.append(result)
+                
+                logger.info(f"Fallback search found {len(clean_results)} memories for user: {user_id}")
+                return clean_results[:limit]  # Return top limit
+            else:
+                return []
+                
         except Exception as e:
             logger.error(f"Fallback search error: {str(e)}")
             return []
