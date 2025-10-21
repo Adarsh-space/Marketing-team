@@ -124,12 +124,14 @@ class ChatMessage(BaseModel):
     user_id: Optional[str] = "default_user"  # Added user_id field
 
 class ChatResponse(BaseModel):
-    type: str  # "conversation" | "campaign_created" | "error"
+    type: str  # "conversation" | "campaign_created" | "image_generated" | "error"
     message: str
     conversation_id: str
     campaign_id: Optional[str] = None
     questions: Optional[List[str]] = []
     ready_to_plan: bool = False
+    image_base64: Optional[str] = None  # For image generation
+    prompt_used: Optional[str] = None  # DALL-E prompt used
 
 class CampaignBrief(BaseModel):
     product: str
