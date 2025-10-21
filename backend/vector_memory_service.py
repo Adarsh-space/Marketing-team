@@ -16,7 +16,7 @@ class VectorMemoryService:
     Enables agents to remember context across sessions and users.
     """
     
-    def __init__(self, db, embedding_model="text-embedding-3-small"):
+    def __init__(self, db, embedding_model="text-embedding-ada-002"):
         self.db = db
         self.embedding_model = embedding_model
         self.embedding_dimension = 1536  # OpenAI embedding dimension
