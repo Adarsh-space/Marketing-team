@@ -733,6 +733,60 @@ async def root():
 # Include router
 app.include_router(api_router)
 
+# HubSpot OAuth callback (root level to match redirect URI)
+@app.get("/callback")
+async def hubspot_oauth_callback(code: str = None, error: str = None):
+    """Handle HubSpot OAuth callback at root level."""
+    try:
+        if error:
+            logger.error(f"OAuth error: {error}")
+            return RedirectResponse(url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/?error={error}")
+        
+        if not code:
+            raise HTTPException(status_code=400, detail="No authorization code provided")
+        
+        # Exchange code for access token
+        token_url = "https://api.hubapi.com/oauth/v1/token"
+        data = {
+            "grant_type": "authorization_code",
+            "client_id": os.environ.get('HUBSPOT_CLIENT_ID'),
+            "client_secret": os.environ.get('HUBSPOT_CLIENT_SECRET'),
+            "redirect_uri": os.environ.get('HUBSPOT_REDIRECT_URI'),
+            "code": code
+        }
+        
+        response = requests.post(token_url, data=data)
+        
+        if response.status_code == 200:
+            token_data = response.json()
+            
+            # Store tokens in database
+            await db.hubspot_tokens.update_one(
+                {"user_id": "default_user"},
+                {
+                    "$set": {
+                        "access_token": token_data.get("access_token"),
+                        "refresh_token": token_data.get("refresh_token"),
+                        "expires_in": token_data.get("expires_in"),
+                        "created_at": datetime.now(timezone.utc).isoformat()
+                    }
+                },
+                upsert=True
+            )
+            
+            logger.info("HubSpot OAuth successful")
+            
+            # Redirect to frontend success page
+            return RedirectResponse(url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?hubspot=connected")
+        else:
+            error_msg = response.json().get("message", "Unknown error")
+            logger.error(f"Token exchange failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+            
+    except Exception as e:
+        logger.error(f"OAuth callback error: {str(e)}")
+        return RedirectResponse(url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/?error=oauth_failed")
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
