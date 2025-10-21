@@ -385,12 +385,12 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Display generated images in chat interface"
     - "Fix campaign creation recursion error"
     - "Fix OpenAI API quota issue for voice services"
-    - "Test all frontend pages"
   stuck_tasks: 
     - "Campaign creation and execution endpoints"
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
