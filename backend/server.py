@@ -24,17 +24,22 @@ from agent_collaboration_system import AgentCollaborationSystem
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection with SSL configuration for Atlas
-import certifi
-
+# MongoDB connection
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(
-    mongo_url,
-    tlsCAFile=certifi.where(),  # Use certifi SSL certificates
-    serverSelectionTimeoutMS=10000,
-    connectTimeoutMS=20000,
-    retryWrites=True
-)
+
+# Configure SSL only for Atlas (srv:// protocol)
+if "mongodb+srv://" in mongo_url:
+    import certifi
+    client = AsyncIOMotorClient(
+        mongo_url,
+        tlsCAFile=certifi.where(),
+        serverSelectionTimeoutMS=10000,
+        connectTimeoutMS=20000
+    )
+else:
+    # Local MongoDB, no SSL
+    client = AsyncIOMotorClient(mongo_url)
+
 db = client[os.environ['DB_NAME']]
 
 async def initialize_database():
