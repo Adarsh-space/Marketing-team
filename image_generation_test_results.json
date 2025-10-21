@@ -1,0 +1,92 @@
+[
+  {
+    "test": "Image Generation Request",
+    "status": "PASS",
+    "message": "Image generated successfully with valid base64 data",
+    "details": {
+      "conversation_id": "54842d8c-5141-41ab-9cab-7f55d95ac5e7",
+      "image_size_bytes": 3015996,
+      "has_prompt": true,
+      "prompt_used": "```json\n{\n  \"prompt\": \"A bright, modern tech startup office with an open workspace layout, featuring..."
+    },
+    "timestamp": "2025-10-21T18:35:07.840167"
+  },
+  {
+    "test": "Regular Chat",
+    "status": "PASS",
+    "message": "Regular chat working correctly without image data",
+    "details": {
+      "conversation_id": "a2d62a08-9e57-441a-aed4-517010a07fab",
+      "response_type": "conversation",
+      "message_preview": "Hi, I remember you're looking to build a marketing strategy. Could you remind me what product or ser"
+    },
+    "timestamp": "2025-10-21T18:35:10.774171"
+  },
+  {
+    "test": "Multi-Image Test 1",
+    "status": "PASS",
+    "message": "Image generated for: Create an image of a professio...",
+    "details": {
+      "image_size": 2673760,
+      "has_prompt": true
+    },
+    "timestamp": "2025-10-21T18:35:38.344602"
+  },
+  {
+    "test": "Multi-Image Test 2",
+    "status": "PASS",
+    "message": "Image generated for: Generate a picture of eco-frie...",
+    "details": {
+      "image_size": 2753552,
+      "has_prompt": true
+    },
+    "timestamp": "2025-10-21T18:36:11.089193"
+  },
+  {
+    "test": "Multi-Image Test 3",
+    "status": "PASS",
+    "message": "Image generated for: Make a visual for a fitness br...",
+    "details": {
+      "image_size": 2893020,
+      "has_prompt": true
+    },
+    "timestamp": "2025-10-21T18:36:49.302428"
+  },
+  {
+    "test": "Multi-Image Test 4",
+    "status": "PASS",
+    "message": "Image generated for: Design a graphic for a food de...",
+    "details": {
+      "image_size": 2722708,
+      "has_prompt": true
+    },
+    "timestamp": "2025-10-21T18:37:17.798369"
+  },
+  {
+    "test": "Multi-Image Summary",
+    "status": "PASS",
+    "message": "Multiple image generation successful: 4/4 (100.0%)",
+    "details": {},
+    "timestamp": "2025-10-21T18:37:19.798536"
+  },
+  {
+    "test": "Conversation Flow Step 1",
+    "status": "PASS",
+    "message": "Initial conversation started",
+    "details": {
+      "conversation_id": "f8d320e4-fbfd-4001-b9eb-d55832adcf9d"
+    },
+    "timestamp": "2025-10-21T18:37:22.362795"
+  },
+  {
+    "test": "Conversation Flow Step 2",
+    "status": "PASS",
+    "message": "Image generated within existing conversation",
+    "details": {
+      "conversation_maintained": true,
+      "image_generated": true,
+      "prompt_included": true
+    },
+    "timestamp": "2025-10-21T18:37:51.562780"
+  }
+]
