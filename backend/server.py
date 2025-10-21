@@ -237,7 +237,9 @@ async def chat(message: ChatMessage):
             conversation_id=conversation_id,
             campaign_id=response.get("campaign_id"),
             questions=response.get("questions", []),
-            ready_to_plan=response.get("ready_to_plan", False)
+            ready_to_plan=response.get("ready_to_plan", False),
+            image_base64=response.get("image_base64"),  # Include image data
+            prompt_used=response.get("prompt_used")  # Include DALL-E prompt
         )
         
     except Exception as e:
