@@ -24,9 +24,14 @@ from agent_collaboration_system import AgentCollaborationSystem
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
+# MongoDB connection with SSL configuration for Atlas
 mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
+client = AsyncIOMotorClient(
+    mongo_url,
+    tlsAllowInvalidCertificates=True,  # For Atlas SSL issues
+    serverSelectionTimeoutMS=5000,
+    connectTimeoutMS=10000
+)
 db = client[os.environ['DB_NAME']]
 
 # Initialize services
