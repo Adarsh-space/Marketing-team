@@ -243,6 +243,24 @@ backend:
       - working: false
         agent: "testing"
         comment: "CRITICAL ISSUE - Campaign creation failing with 500 error and RecursionError in FastAPI JSON encoder. Campaign listing works (shows 2 existing campaigns). Issue appears to be circular reference in data structures returned by orchestrator. Needs investigation of MongoDB ObjectId serialization or circular references in agent responses."
+      - working: "NA"
+        agent: "main"
+        comment: "Added _clean_for_json method to remove MongoDB ObjectIds and handle circular references. Needs retesting."
+
+  - task: "Image generation with DALL-E"
+    implemented: true
+    working: false
+    file: "backend/agents/image_generation_agent.py, backend/agents/orchestrator.py, backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported image generation returning empty response despite backend logs showing successful generation. Image data not being returned in API response."
+      - working: "NA"
+        agent: "main"
+        comment: "Using Emergent LLM key. ChatResponse model has image_base64 field. Investigating why image data not flowing through API response."
 
   - task: "HubSpot Private App integration (simplified)"
     implemented: false
