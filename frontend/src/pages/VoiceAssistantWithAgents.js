@@ -107,10 +107,17 @@ const VoiceAssistantWithAgents = () => {
 
       addAgentLog('ConversationalAgent', 'RECEIVED', `User said: "${transcript}"`);
 
+      console.log('Sending request to:', `${API}/chat`);
+      console.log('Request data:', { message: transcript, conversation_id: conversationId });
+
       const chatResponse = await axios.post(`${API}/chat`, {
         message: transcript,
         conversation_id: conversationId
+      }, {
+        timeout: 60000 // 60 second timeout for image generation
       });
+      
+      console.log('Received response, status:', chatResponse.status);
 
       const aiResponse = chatResponse.data.message;
       const imageData = chatResponse.data.image_base64;
