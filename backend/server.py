@@ -14,10 +14,12 @@ import httpx
 from authlib.integrations.starlette_client import OAuth
 import io
 
-# Import agent orchestrator, voice service, and social media service
+# Import agent orchestrator, voice service, social media service, vector memory, and collaboration system
 from agents.orchestrator import AgentOrchestrator
 from voice_service import VoiceService
 from social_media_service import SocialMediaService
+from vector_memory_service import VectorMemoryService
+from agent_collaboration_system import AgentCollaborationSystem
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
