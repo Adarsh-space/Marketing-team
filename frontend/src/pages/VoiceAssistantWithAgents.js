@@ -111,6 +111,8 @@ const VoiceAssistantWithAgents = () => {
       });
 
       const aiResponse = chatResponse.data.message;
+      const imageData = chatResponse.data.image_base64;
+      const promptUsed = chatResponse.data.prompt_used;
       
       if (!conversationId) {
         setConversationId(chatResponse.data.conversation_id);
@@ -133,7 +135,22 @@ const VoiceAssistantWithAgents = () => {
         addAgentLog('ConversationalAgent', 'RESPONSE', 'Asking clarifying questions');
       }
 
-      setMessages(prev => [...prev, { role: "assistant", content: aiResponse }]);
+      // Add message with image data if available
+      const assistantMessage = { 
+        role: "assistant", 
+        content: aiResponse,
+        image: imageData,
+        prompt: promptUsed
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Log image generation if it happened
+      if (imageData) {
+        addAgentLog('ImageGenerationAgent', 'COMPLETE', `Generated image using DALL-E`);
+        toast.success('🎨 Image generated!');
+      }
+      
       speakText(aiResponse);
 
       if (chatResponse.data.ready_to_plan && chatResponse.data.campaign_id) {
