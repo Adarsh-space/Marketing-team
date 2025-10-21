@@ -99,15 +99,51 @@ async def chat(message: ChatMessage):
     """
     Process user message through Conversational Interface Agent.
     Gathers requirements and creates campaigns when ready.
+    NOW WITH VECTOR MEMORY!
     """
     try:
+        user_id = message.user_id or "default_user"
+        
         # Generate conversation ID if not provided
         conversation_id = message.conversation_id or str(uuid.uuid4())
         
-        # Process message through orchestrator
+        # Get or create tenant for this user
+        tenant = await vector_memory.get_or_create_tenant(user_id)
+        
+        # If new user, greet them
+        if tenant["is_new"]:
+            logger.info(f"New user detected: {user_id}, creating tenant")
+        
+        # Store user message in vector memory
+        await vector_memory.store_memory(
+            user_id=user_id,
+            content=message.message,
+            memory_type="user_message",
+            metadata={"conversation_id": conversation_id}
+        )
+        
+        # Get relevant context from vector memory
+        context = await vector_memory.get_context_for_agent(
+            user_id=user_id,
+            agent_name="ConversationalAgent",
+            query=message.message
+        )
+        
+        # Publish event: User message received
+        await collaboration_system.publish_event(
+            agent_name="System",
+            event_type="user_message_received",
+            data={"message": message.message[:100]},
+            user_id=user_id,
+            conversation_id=conversation_id
+        )
+        
+        # Process message through orchestrator (with context)
         response = await orchestrator.process_user_message(
             user_message=message.message,
-            conversation_id=conversation_id
+            conversation_id=conversation_id,
+            vector_context=context  # Pass memory context
+        )
         )
         
         return ChatResponse(
