@@ -93,15 +93,15 @@ class VectorMemoryService:
             from openai import AsyncOpenAI
             import os
             
+            # Use Emergent LLM key which works with OpenAI API
             api_key = os.environ.get('EMERGENT_LLM_KEY')
-            client = AsyncOpenAI(
-                api_key=api_key,
-                base_url="https://api.emergent.ai/v1"
-            )
+            
+            # Use standard OpenAI endpoint (Emergent key works with it)
+            client = AsyncOpenAI(api_key=api_key)
             
             # Generate embedding
             response = await client.embeddings.create(
-                input=text,
+                input=text[:8000],  # Limit text length
                 model="text-embedding-3-small"
             )
             
@@ -115,8 +115,6 @@ class VectorMemoryService:
                 
         except Exception as e:
             logger.error(f"Error generating embedding: {str(e)}")
-            import traceback
-            traceback.print_exc()
             return None
     
     async def store_memory(
