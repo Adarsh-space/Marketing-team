@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Sparkles, Mic, MicOff, ArrowLeft, Users, MessageSquare } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Sparkles, Mic, MicOff, ArrowLeft, Users, MessageSquare, Send } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
