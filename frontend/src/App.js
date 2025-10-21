@@ -22,6 +22,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/campaign/:campaignId" element={<CampaignPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/test-image" element={<ImageTestPage />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
