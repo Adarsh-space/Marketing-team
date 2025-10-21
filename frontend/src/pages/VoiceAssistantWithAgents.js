@@ -20,6 +20,7 @@ const VoiceAssistantWithAgents = () => {
   const [processing, setProcessing] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const [currentAgent, setCurrentAgent] = useState(null);
+  const [textMessage, setTextMessage] = useState("");
   
   const recognitionRef = useRef(null);
   const synthRef = useRef(null);
