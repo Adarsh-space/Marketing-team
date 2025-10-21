@@ -144,6 +144,25 @@ async def chat(message: ChatMessage):
             conversation_id=conversation_id,
             vector_context=context  # Pass memory context
         )
+        
+        # Store agent response in vector memory
+        agent_message = response.get("message", "")
+        if agent_message:
+            await vector_memory.store_memory(
+                user_id=user_id,
+                content=agent_message,
+                memory_type="agent_response",
+                agent_name="ConversationalAgent",
+                metadata={"conversation_id": conversation_id}
+            )
+        
+        # Publish event: Agent responded
+        await collaboration_system.publish_event(
+            agent_name="ConversationalAgent",
+            event_type="agent_responded",
+            data={"response_type": response.get("type")},
+            user_id=user_id,
+            conversation_id=conversation_id
         )
         
         return ChatResponse(
