@@ -145,6 +145,113 @@ async def get_conversation(conversation_id: str):
         logger.error(f"Error fetching conversation: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Vector Memory Endpoints ====================
+
+@api_router.post("/memory/search")
+async def search_memories(data: Dict[str, Any]):
+    """
+    Semantic search in vector memory.
+    
+    Expected data:
+    {
+        "user_id": "user_id",
+        "query": "search query",
+        "limit": 5,
+        "scope": "user" or "agent" or "global"
+    }
+    """
+    try:
+        user_id = data.get("user_id", "default_user")
+        query = data.get("query", "")
+        limit = data.get("limit", 5)
+        scope = data.get("scope", "user")
+        
+        if not query:
+            raise HTTPException(status_code=400, detail="Query is required")
+        
+        results = await vector_memory.search_memories(
+            user_id=user_id,
+            query=query,
+            limit=limit,
+            scope=scope
+        )
+        
+        return {
+            "status": "success",
+            "results": results,
+            "count": len(results)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Memory search error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/memory/profile/{user_id}")
+async def get_user_profile(user_id: str):
+    """Get user profile built from memories."""
+    try:
+        profile = await vector_memory.get_user_profile(user_id)
+        
+        if not profile:
+            raise HTTPException(status_code=404, detail="User profile not found")
+        
+        return {
+            "status": "success",
+            "profile": profile
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user profile: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Agent Collaboration Endpoints ====================
+
+@api_router.get("/collaboration/events/{conversation_id}")
+async def get_collaboration_events(conversation_id: str, limit: int = Query(default=50, le=100)):
+    """
+    Get all agent collaboration events for a conversation.
+    Shows how agents are working together.
+    """
+    try:
+        events = await collaboration_system.get_conversation_events(
+            conversation_id=conversation_id,
+            limit=limit
+        )
+        
+        return {
+            "status": "success",
+            "events": events,
+            "count": len(events)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting collaboration events: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/collaboration/agent/{agent_name}")
+async def get_agent_activity(agent_name: str, limit: int = Query(default=20, le=50)):
+    """Get recent activity for a specific agent."""
+    try:
+        activity = await collaboration_system.get_agent_activity(
+            agent_name=agent_name,
+            limit=limit
+        )
+        
+        return {
+            "status": "success",
+            "agent": agent_name,
+            "activity": activity,
+            "count": len(activity)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting agent activity: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Campaign Endpoints ====================
 
 @api_router.post("/campaigns")
