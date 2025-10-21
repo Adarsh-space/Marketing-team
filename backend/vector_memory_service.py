@@ -103,10 +103,10 @@ class VectorMemoryService:
             # Use standard OpenAI endpoint
             client = AsyncOpenAI(api_key=api_key)
             
-            # Generate embedding
+            # Generate embedding (use ada-002 which all keys have access to)
             response = await client.embeddings.create(
                 input=text[:8000],  # Limit text length
-                model="text-embedding-3-small"
+                model="text-embedding-ada-002"
             )
             
             if response.data and len(response.data) > 0:
