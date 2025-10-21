@@ -75,7 +75,8 @@ class AgentOrchestrator:
             cia = self.agents["ConversationalAgent"]
             response = await cia.execute({
                 "user_message": user_message,
-                "conversation_history": conversation.get("messages", [])
+                "conversation_history": conversation.get("messages", []),
+                "vector_context": vector_context  # ADD THIS!
             })
             
             # Add assistant response to history
