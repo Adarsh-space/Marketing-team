@@ -265,7 +265,23 @@ const VoiceAssistantWithAgents = () => {
                   <p className="text-sm font-medium text-slate-300 mb-1">
                     {msg.role === 'user' ? 'You' : 'AI Assistant'}
                   </p>
-                  <p className="text-white text-sm leading-relaxed">{msg.content}</p>
+                  <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                  
+                  {/* Display image if available */}
+                  {msg.image && (
+                    <div className="mt-4">
+                      <img 
+                        src={`data:image/png;base64,${msg.image}`}
+                        alt={msg.prompt || "Generated image"}
+                        className="rounded-lg max-w-full h-auto border-2 border-white/20 shadow-lg"
+                      />
+                      {msg.prompt && (
+                        <p className="text-xs text-slate-400 mt-2 italic">
+                          Prompt: {msg.prompt}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
               <div ref={messagesEndRef} />
