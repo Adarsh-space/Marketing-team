@@ -278,9 +278,23 @@ Here's what I found:
     def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
         """Parse conversational response."""
         try:
+            # Try to parse as JSON first
             parsed = json.loads(response)
             return parsed
         except json.JSONDecodeError:
+            # If not JSON, try to extract JSON from text
+            import re
+            json_match = re.search(r'\{[\s\S]*\}', response)
+            if json_match:
+                try:
+                    parsed = json.loads(json_match.group(0))
+                    logger.info(f"Extracted JSON from text response")
+                    return parsed
+                except:
+                    pass
+            
+            # If still no JSON, return as plain response
+            logger.warning(f"Could not parse JSON from response, returning as plain text")
             return {
                 "ready_to_plan": False,
                 "response": response,
