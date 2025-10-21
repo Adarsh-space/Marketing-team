@@ -34,6 +34,56 @@ client = AsyncIOMotorClient(
 )
 db = client[os.environ['DB_NAME']]
 
+async def initialize_database():
+    """Initialize database collections and indexes on startup."""
+    try:
+        logger.info("Initializing database collections...")
+        
+        # Get list of existing collections
+        existing_collections = await db.list_collection_names()
+        
+        # Collections to create
+        required_collections = [
+            "conversations",
+            "campaigns", 
+            "user_memory",
+            "agent_memory",
+            "global_memory",
+            "tenants",
+            "agent_events",
+            "agent_tasks",
+            "hubspot_tokens",
+            "settings",
+            "published_content"
+        ]
+        
+        # Create missing collections
+        for collection_name in required_collections:
+            if collection_name not in existing_collections:
+                await db.create_collection(collection_name)
+                logger.info(f"✅ Created collection: {collection_name}")
+            else:
+                logger.info(f"✓ Collection exists: {collection_name}")
+        
+        # Create indexes
+        await db.conversations.create_index("conversation_id", unique=True)
+        await db.campaigns.create_index("campaign_id", unique=True)
+        await db.tenants.create_index("user_id", unique=True)
+        await db.user_memory.create_index("user_id")
+        await db.agent_memory.create_index("agent_name")
+        await db.agent_events.create_index([("conversation_id", 1), ("timestamp", -1)])
+        
+        logger.info("✅ Database initialization complete!")
+        
+        # Test connection
+        await db.command("ping")
+        logger.info("✅ MongoDB Atlas connection successful!")
+        
+    except Exception as e:
+        logger.error(f"❌ Database initialization error: {str(e)}")
+        # Don't fail the app, continue with warnings
+        pass
+
 # Initialize services
 orchestrator = AgentOrchestrator(db)
 voice_service = VoiceService()
