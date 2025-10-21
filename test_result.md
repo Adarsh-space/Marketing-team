@@ -362,6 +362,21 @@ frontend:
         agent: "main"
         comment: "IMPLEMENTED - Split-screen view showing user conversation and agent communication logs with real-time updates"
 
+  - task: "Display generated images in chat interface"
+    implemented: false
+    working: "NA"
+    file: "frontend/src/pages/VoiceAssistantWithAgents.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported that generated images are not displaying in the UI despite backend successfully generating them"
+      - working: "NA"
+        agent: "main"
+        comment: "FIXING NOW - Backend returns image_base64 field in ChatResponse but frontend doesn't extract or display it. Adding image rendering logic to display base64 images in the chat messages."
+
 metadata:
   created_by: "main_agent"
   version: "1.0"
