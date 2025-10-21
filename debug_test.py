@@ -6,7 +6,7 @@ Debug specific backend issues
 import requests
 import json
 
-BASE_URL = "https://intellimarket-1.preview.emergentagent.com/api"
+BASE_URL = "https://marketing-minds.preview.emergentagent.com/api"
 
 def test_agent_names():
     """Test to see what agent names are available"""
