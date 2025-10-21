@@ -183,8 +183,21 @@ const VoiceAssistantWithAgents = () => {
       }
 
     } catch (error) {
-      toast.error('Failed to process your message.');
-      addAgentLog('System', 'ERROR', 'Failed to process request');
+      console.error('=== ERROR IN processTranscript ===');
+      console.error('Error details:', error);
+      console.error('Error message:', error.message);
+      console.error('Error response:', error.response?.data);
+      console.error('================================');
+      
+      toast.error(`Failed to process your message: ${error.message}`);
+      addAgentLog('System', 'ERROR', `Failed to process request: ${error.message}`);
+      
+      // Add error message to chat
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: `Sorry, I encountered an error: ${error.message}. Please try again.`,
+        timestamp: Date.now()
+      }]);
     } finally {
       setProcessing(false);
     }
