@@ -335,43 +335,65 @@ const VoiceAssistantWithAgents = () => {
         </div>
       </div>
 
-      {/* Voice Control */}
+      {/* Voice Control & Text Input */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
         <div className="max-w-7xl mx-auto px-6 pb-8">
           <Card className="backdrop-blur-2xl bg-black/40 border-white/20 p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <div className="text-left">
-                <p className="text-lg font-semibold text-white mb-1">
-                  {isListening ? '🎤 Listening...' : isSpeaking ? '🔊 Speaking...' : processing ? '⚙️ Processing...' : '✅ Ready'}
-                </p>
-                <p className="text-sm text-slate-400">
-                  {isListening ? 'Speak clearly' : isSpeaking ? 'Playing response' : processing ? 'Agents working...' : 'Click mic to start'}
-                </p>
-              </div>
-
-              <div className="flex gap-4">
+            <div className="space-y-4">
+              {/* Text Input Row */}
+              <div className="flex gap-3 items-center">
+                <Input
+                  value={textMessage}
+                  onChange={(e) => setTextMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendTextMessage()}
+                  placeholder="Type your message here..."
+                  className="flex-1 bg-white/10 text-white border-white/20 placeholder:text-slate-400"
+                  disabled={processing}
+                />
                 <Button
-                  size="lg"
-                  disabled={processing || isSpeaking}
-                  onClick={isListening ? stopListening : startListening}
-                  className={`w-20 h-20 rounded-full ${
-                    isListening
-                      ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse'
-                      : 'bg-gradient-to-br from-cyan-500 to-blue-500'
-                  } shadow-2xl`}
+                  onClick={handleSendTextMessage}
+                  disabled={processing || !textMessage.trim()}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
                 >
-                  {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
+                  <Send className="w-4 h-4" />
                 </Button>
-                
-                {isSpeaking && (
+              </div>
+              
+              {/* Voice Control Row */}
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <p className="text-lg font-semibold text-white mb-1">
+                    {isListening ? '🎤 Listening...' : isSpeaking ? '🔊 Speaking...' : processing ? '⚙️ Processing...' : '✅ Ready'}
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    {isListening ? 'Speak clearly' : isSpeaking ? 'Playing response' : processing ? 'Agents working...' : 'Type or click mic'}
+                  </p>
+                </div>
+
+                <div className="flex gap-4">
                   <Button
                     size="lg"
-                    onClick={stopSpeaking}
-                    className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-500 to-red-500"
+                    disabled={processing || isSpeaking}
+                    onClick={isListening ? stopListening : startListening}
+                    className={`w-20 h-20 rounded-full ${
+                      isListening
+                        ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse'
+                        : 'bg-gradient-to-br from-cyan-500 to-blue-500'
+                    } shadow-2xl`}
                   >
-                    ⏸️
+                    {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
                   </Button>
-                )}
+                  
+                  {isSpeaking && (
+                    <Button
+                      size="lg"
+                      onClick={stopSpeaking}
+                      className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-500 to-red-500"
+                    >
+                      ⏸️
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
