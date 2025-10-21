@@ -12,7 +12,7 @@ from datetime import datetime
 import uuid
 
 # Configuration
-BASE_URL = "https://voiceagents-1.preview.emergentagent.com/api"
+BASE_URL = "https://intellimarket-1.preview.emergentagent.com/api"
 TIMEOUT = 30
 
 class BackendTester:
