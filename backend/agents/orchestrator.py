@@ -41,9 +41,15 @@ class AgentOrchestrator:
         }
         logger.info("AgentOrchestrator initialized with all agents")
     
-    async def process_user_message(self, user_message: str, conversation_id: str) -> Dict[str, Any]:
+    async def process_user_message(
+        self,
+        user_message: str,
+        conversation_id: str,
+        vector_context: str = None
+    ) -> Dict[str, Any]:
         """
         Process a user message through the Conversational Interface Agent.
+        Now with vector memory context!
         """
         try:
             # Get conversation history
