@@ -238,21 +238,27 @@ Here's what I found:
             }
     
     def _prepare_prompt_with_browsing(self, task_payload: Dict[str, Any]) -> str:
-        """Prepare prompt with browsing results if available."""
+        """Prepare prompt with browsing results and vector memory if available."""
         user_message = task_payload.get('user_message', '')
         conversation_history = task_payload.get('conversation_history', [])
         website_browsing = task_payload.get('website_browsing_results', '')
+        vector_context = task_payload.get('vector_context', '')
         
         prompt = f"User message: {user_message}\n\n"
         
+        # Add vector memory context if available (MOST IMPORTANT!)
+        if vector_context:
+            prompt += f"📝 YOUR MEMORY (What you remember about this user):\n{vector_context}\n\n"
+            prompt += "⚠️ IMPORTANT: Use this memory! Don't ask for info already here!\n\n"
+        
         # Add website browsing results if available
         if website_browsing:
-            prompt += f"🌐 WEBSITE BROWSING RESULTS:\n{website_browsing}\n\n"
-            prompt += "✅ Use the actual website content above to personalize your response and create relevant marketing content.\n\n"
+            prompt += f"🌐 WEBSITE CONTENT:\n{website_browsing}\n\n"
         
+        # Add recent conversation
         if conversation_history:
-            prompt += "Previous conversation:\n"
-            for msg in conversation_history[-5:]:
+            prompt += "Recent conversation:\n"
+            for msg in conversation_history[-3:]:  # Only last 3 to save tokens
                 role = msg.get('role', 'user')
                 content = msg.get('content', '')
                 prompt += f"{role}: {content}\n"
