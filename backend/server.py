@@ -58,6 +58,7 @@ logger = logging.getLogger(__name__)
 class ChatMessage(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    user_id: Optional[str] = "default_user"  # Added user_id field
 
 class ChatResponse(BaseModel):
     type: str  # "conversation" | "campaign_created" | "error"
