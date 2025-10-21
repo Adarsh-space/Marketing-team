@@ -249,11 +249,11 @@ backend:
 
   - task: "Image generation with DALL-E"
     implemented: true
-    working: false
+    working: true
     file: "backend/agents/image_generation_agent.py, backend/agents/orchestrator.py, backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: false
         agent: "user"
@@ -261,6 +261,9 @@ backend:
       - working: "NA"
         agent: "main"
         comment: "Using Emergent LLM key. ChatResponse model has image_base64 field. Investigating why image data not flowing through API response."
+      - working: true
+        agent: "main"
+        comment: "FIXED - Image generation now working perfectly with Emergent LLM key. Successfully generated image using DALL-E (gpt-image-1 model). Image data flows correctly from ImageGenerationAgent → Orchestrator → API Response. Base64 encoded PNG image returned successfully. Prompt: 'Modern tech startup office with open workspace...' returned valid image data."
 
   - task: "HubSpot Private App integration (simplified)"
     implemented: false
