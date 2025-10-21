@@ -271,37 +271,57 @@ const VoiceAssistantWithAgents = () => {
             </div>
             
             <div className="space-y-4">
-              {messages.map((msg, idx) => (
-                <div 
-                  key={idx}
-                  className={`p-4 rounded-xl ${
-                    msg.role === 'user'
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 ml-8'
-                      : 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 mr-8'
-                  }`}
-                >
-                  <p className="text-sm font-medium text-slate-300 mb-1">
-                    {msg.role === 'user' ? 'You' : 'AI Assistant'}
-                  </p>
-                  <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  
-                  {/* Display image if available */}
-                  {msg.image && (
-                    <div className="mt-4">
-                      <img 
-                        src={`data:image/png;base64,${msg.image}`}
-                        alt={msg.prompt || "Generated image"}
-                        className="rounded-lg max-w-full h-auto border-2 border-white/20 shadow-lg"
-                      />
-                      {msg.prompt && (
-                        <p className="text-xs text-slate-400 mt-2 italic">
-                          Prompt: {msg.prompt}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {messages.map((msg, idx) => {
+                // Generate unique key for proper React reconciliation
+                const uniqueKey = `${msg.role}-${idx}-${msg.content?.substring(0, 10)}-${msg.image ? 'with-image' : 'no-image'}`;
+                
+                // Debug log for each message render
+                if (msg.image) {
+                  console.log(`Rendering message ${idx} with image, length:`, msg.image?.length);
+                }
+                
+                return (
+                  <div 
+                    key={uniqueKey}
+                    className={`p-4 rounded-xl ${
+                      msg.role === 'user'
+                        ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 ml-8'
+                        : 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 mr-8'
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-slate-300 mb-1">
+                      {msg.role === 'user' ? 'You' : 'AI Assistant'}
+                    </p>
+                    <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    
+                    {/* Display image if available */}
+                    {msg.image && (
+                      <div className="mt-4">
+                        <p className="text-xs text-green-400 mb-2">🎨 Generated Image:</p>
+                        <img 
+                          src={`data:image/png;base64,${msg.image}`}
+                          alt={msg.prompt || "Generated image"}
+                          className="rounded-lg max-w-full h-auto border-2 border-white/20 shadow-lg"
+                          onLoad={() => console.log('Image loaded successfully')}
+                          onError={(e) => console.error('Image failed to load:', e)}
+                        />
+                        {msg.prompt && (
+                          <p className="text-xs text-slate-400 mt-2 italic">
+                            Prompt: {msg.prompt}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Debug info */}
+                    {msg.image && (
+                      <p className="text-xs text-yellow-400 mt-1">
+                        [Debug: Image data present, length: {msg.image.length} chars]
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               <div ref={messagesEndRef} />
             </div>
           </Card>
