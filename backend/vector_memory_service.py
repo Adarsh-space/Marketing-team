@@ -87,26 +87,29 @@ class VectorMemoryService:
     
     async def generate_embedding(self, text: str) -> List[float]:
         """
-        Generate OpenAI embedding for text.
+        Generate OpenAI embedding for text using emergentintegrations.
         """
         try:
-            from emergentintegrations.llm.openai.embeddings import OpenAIEmbeddings
+            from emergentintegrations.llm.embeddings import Embeddings
             import os
             
             api_key = os.environ.get('EMERGENT_LLM_KEY')
-            embeddings_api = OpenAIEmbeddings(api_key=api_key)
             
-            # Generate embedding
-            embedding_result = await embeddings_api.create_embeddings(
+            # Create embeddings instance
+            embeddings = Embeddings(api_key=api_key)
+            
+            # Generate embedding using async method
+            result = await embeddings.create_embeddings(
                 input_text=text,
-                model=self.embedding_model
+                model="text-embedding-3-small"
             )
             
-            # Extract embedding vector
-            if isinstance(embedding_result, list) and len(embedding_result) > 0:
-                return embedding_result[0]
+            # Result is a list of embeddings
+            if result and len(result) > 0:
+                logger.info(f"Generated embedding: {len(result[0])} dimensions")
+                return result[0]
             else:
-                logger.error(f"Unexpected embedding format: {type(embedding_result)}")
+                logger.error("No embedding returned")
                 return None
                 
         except Exception as e:
