@@ -670,6 +670,58 @@ async def agent_chat(data: Dict[str, Any]):
         else:
             response_text = str(agent_result)
 
+        # Check if user requested image or video generation
+        image_base64 = None
+        video_concept = None
+        prompt_used = None
+
+        # Detect image generation requests
+        image_keywords = ["create image", "generate image", "make image", "design image",
+                         "create visual", "generate visual", "create graphic", "generate graphic",
+                         "create picture", "show me image", "create post image"]
+
+        video_keywords = ["create video", "generate video", "make video", "design video",
+                         "create clip", "video concept", "video storyboard"]
+
+        message_lower = message.lower()
+
+        # Generate image if requested
+        if any(keyword in message_lower for keyword in image_keywords):
+            try:
+                logger.info("Image generation requested, generating...")
+                image_agent = orchestrator.agents.get("ImageGenerationAgent")
+                if image_agent:
+                    img_result = await image_agent.generate_image_from_context({
+                        "content": message,
+                        "platform": "social media",
+                        "brand_info": ""
+                    })
+                    if img_result.get("status") == "success":
+                        image_base64 = img_result.get("image_base64")
+                        prompt_used = img_result.get("prompt_used")
+                        logger.info(f"Image generated successfully, size: {len(image_base64) if image_base64 else 0}")
+            except Exception as e:
+                logger.error(f"Image generation error: {str(e)}")
+
+        # Generate video concept if requested
+        elif any(keyword in message_lower for keyword in video_keywords):
+            try:
+                logger.info("Video generation requested, generating concept...")
+                from agents.video_generation_agent import VideoGenerationAgent
+                video_agent = VideoGenerationAgent()
+                video_result = await video_agent.generate_video_concept({
+                    "content": message,
+                    "platform": "Instagram Reels",
+                    "duration": 30,
+                    "style": "modern and engaging",
+                    "goal": "engagement"
+                })
+                if "error" not in video_result:
+                    video_concept = video_result
+                    logger.info("Video concept generated successfully")
+            except Exception as e:
+                logger.error(f"Video generation error: {str(e)}")
+
         # Store agent response in vector memory
         await vector_memory.store_memory(
             user_id=user_id,
@@ -688,7 +740,13 @@ async def agent_chat(data: Dict[str, Any]):
             conversation_id=conversation_id
         )
 
-        return {"response": response_text}
+        return {
+            "response": response_text,
+            "image_base64": image_base64,
+            "video_concept": video_concept,
+            "prompt_used": prompt_used,
+            "conversation_id": conversation_id
+        }
 
     except HTTPException:
         raise

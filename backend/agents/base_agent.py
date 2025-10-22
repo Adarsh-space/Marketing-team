@@ -75,9 +75,9 @@ class BaseAgent:
 
         # Add vector memory context (if available)
         if vector_context:
-            prompt_parts.append("📝 RELEVANT CONTEXT FROM MEMORY:")
+            prompt_parts.append("RELEVANT CONTEXT FROM MEMORY:")
             prompt_parts.append(vector_context)
-            prompt_parts.append("\n⚠️ Use this context to provide better responses!\n")
+            prompt_parts.append("\nUse this context to provide better responses!\n")
 
         # Add main task payload
         prompt_parts.append("TASK DETAILS:")
