@@ -347,7 +347,7 @@ const HomePage = () => {
                 key={index}
                 className="p-6 glass border-white/30 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
                 data-testid={`feature-card-${index}`}
-                onClick={() => navigate(`/agents?agent=${feature.agentId}`)}
+                onClick={() => navigate(`/agent-chat?agent=${feature.agentId}`)}
               >
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mb-4 text-white shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform">
                   {feature.icon}

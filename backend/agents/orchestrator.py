@@ -15,6 +15,7 @@ from .ppc_agent import PPCAgent
 from .analytics_agent import AnalyticsAgent
 from .reporting_agent import ReportingAgent
 from .image_generation_agent import ImageGenerationAgent
+from .video_generation_agent import VideoGenerationAgent
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,10 @@ class AgentOrchestrator:
             "PPCAgent": PPCAgent(),
             "AnalyticsAgent": AnalyticsAgent(),
             "ReportingAgent": ReportingAgent(),
-            "ImageGenerationAgent": ImageGenerationAgent()
+            "ImageGenerationAgent": ImageGenerationAgent(),
+            "VideoGenerationAgent": VideoGenerationAgent()
         }
-        logger.info("AgentOrchestrator initialized with all agents")
+        logger.info("AgentOrchestrator initialized with all agents including VideoGenerationAgent")
     
     async def process_user_message(
         self,
