@@ -762,53 +762,82 @@ async def generate_image(data: Dict[str, Any]):
 @api_router.post("/generate-video")
 async def generate_video(data: Dict[str, Any]):
     """
-    Generate marketing video concept using AI.
+    Generate marketing video using Sora AI.
 
     Expected data:
     {
         "content": "Marketing message/product description",
         "brand_info": "Brand information (optional)",
         "platform": "Target platform like TikTok, Instagram Reels, YouTube",
-        "duration": Duration in seconds (15, 30, 60),
-        "style": "Video style preference",
-        "goal": "Campaign goal (awareness, conversions, engagement)"
+        "duration": Duration in seconds (4-20),
+        "resolution": "720p or 1080p",
+        "conversation_id": "conversation_id to get context (optional)"
     }
     """
     try:
         content = data.get("content", "")
         brand_info = data.get("brand_info", "")
         platform = data.get("platform", "Instagram Reels")
-        duration = data.get("duration", 30)
-        style = data.get("style", "modern and engaging")
-        goal = data.get("goal", "engagement")
+        duration = data.get("duration", 10)
+        resolution = data.get("resolution", "1080p")
+        conversation_id = data.get("conversation_id")
 
-        # Import VideoGenerationAgent
-        from agents.video_generation_agent import VideoGenerationAgent
+        # Validate duration (Sora supports 4-20 seconds)
+        if duration < 4:
+            duration = 4
+        elif duration > 20:
+            duration = 20
 
-        video_agent = VideoGenerationAgent()
+        # If conversation_id provided, get additional context
+        if conversation_id:
+            conversation = await db.conversations.find_one({"conversation_id": conversation_id})
+            if conversation:
+                messages = conversation.get("messages", [])
+                for msg in messages:
+                    if msg.get("role") == "user":
+                        user_content = msg.get("content", "")
+                        if "website" in user_content.lower() or ".com" in user_content:
+                            brand_info += f" {user_content}"
 
-        # Generate video concept
-        logger.info(f"Generating video concept for: {content[:100]}...")
-        result = await video_agent.generate_video_concept({
+        # Get SoraVideoAgent
+        sora_agent = orchestrator.agents.get("SoraVideoAgent")
+        
+        if not sora_agent:
+            raise HTTPException(status_code=500, detail="Sora video generation agent not available")
+
+        # Generate video
+        logger.info(f"Generating video for content: {content[:100]}...")
+        result = await sora_agent.generate_video_from_context({
             "content": content,
             "brand_info": brand_info,
             "platform": platform,
             "duration": duration,
-            "style": style,
-            "goal": goal
+            "resolution": resolution
         })
 
-        if "error" not in result:
+        if result.get("status") == "success":
             return {
                 "status": "success",
-                "video_concept": result,
-                "message": "Video concept generated successfully!",
-                "note": "This is a video concept/storyboard. Actual video rendering requires external video AI service."
+                "video_base64": result.get("video_base64"),
+                "prompt": result.get("prompt_used"),
+                "duration": result.get("duration"),
+                "resolution": result.get("resolution"),
+                "message": "Video generated successfully!"
+            }
+        elif result.get("status") == "concept_only":
+            # Sora not available, return concept
+            return {
+                "status": "concept_only",
+                "video_concept": result.get("video_concept"),
+                "duration": result.get("duration"),
+                "resolution": result.get("resolution"),
+                "message": result.get("message"),
+                "note": result.get("note")
             }
         else:
             raise HTTPException(
                 status_code=500,
-                detail=result.get("details", "Video generation failed")
+                detail=result.get("message", "Video generation failed")
             )
 
     except HTTPException:
