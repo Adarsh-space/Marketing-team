@@ -40,9 +40,10 @@ class AgentOrchestrator:
             "AnalyticsAgent": AnalyticsAgent(),
             "ReportingAgent": ReportingAgent(),
             "ImageGenerationAgent": ImageGenerationAgent(),
-            "VideoGenerationAgent": VideoGenerationAgent()
+            "VideoGenerationAgent": VideoGenerationAgent(),
+            "SoraVideoAgent": SoraVideoAgent()
         }
-        logger.info("AgentOrchestrator initialized with all agents including VideoGenerationAgent")
+        logger.info("AgentOrchestrator initialized with all agents including VideoGenerationAgent and SoraVideoAgent")
     
     async def process_user_message(
         self,
