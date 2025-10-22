@@ -21,7 +21,8 @@ const VoiceAssistantWithAgents = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const [currentAgent, setCurrentAgent] = useState(null);
   const [textMessage, setTextMessage] = useState("");
-  
+  const [isMinimized, setIsMinimized] = useState(false);
+
   const recognitionRef = useRef(null);
   const synthRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -294,17 +295,19 @@ const VoiceAssistantWithAgents = () => {
       </div>
 
       {/* Split Screen Layout */}
-      <div className="pt-32 pb-40 px-6 h-screen">
+      <div className="pt-32 pb-24 px-6 h-screen">
         <div className="max-w-7xl mx-auto h-full grid grid-cols-1 lg:grid-cols-2 gap-6">
           
           {/* LEFT: User Conversation */}
-          <Card className="backdrop-blur-lg bg-black/30 border-white/20 p-6 overflow-y-auto">
-            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/20">
-              <MessageSquare className="w-5 h-5 text-cyan-400" />
-              <h3 className="text-lg font-semibold text-white">Your Conversation</h3>
+          <Card className="backdrop-blur-lg bg-black/30 border-white/20 overflow-hidden flex flex-col">
+            <div className="sticky top-0 z-10 backdrop-blur-lg bg-black/50 px-6 py-4 border-b border-white/20">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-lg font-semibold text-white">Your Conversation</h3>
+              </div>
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map((msg, idx) => {
                 // Generate unique key for proper React reconciliation
                 const uniqueKey = `${msg.role}-${idx}-${msg.content?.substring(0, 10)}-${msg.image ? 'with-image' : 'no-image'}`;
@@ -361,19 +364,22 @@ const VoiceAssistantWithAgents = () => {
           </Card>
 
           {/* RIGHT: Agent Communication */}
-          <Card className="backdrop-blur-lg bg-black/30 border-white/20 p-6 overflow-y-auto">
-            <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/20">
-              <Users className="w-5 h-5 text-purple-400" />
-              <h3 className="text-lg font-semibold text-white">Agent Communication</h3>
-            </div>
-            
-            {agentLogs.length === 0 ? (
-              <div className="text-center py-12">
-                <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
-                <p className="text-slate-400 text-sm">Agents will communicate here when you start a conversation</p>
+          <Card className="backdrop-blur-lg bg-black/30 border-white/20 overflow-hidden flex flex-col">
+            <div className="sticky top-0 z-10 backdrop-blur-lg bg-black/50 px-6 py-4 border-b border-white/20">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-purple-400" />
+                <h3 className="text-lg font-semibold text-white">Agent Communication</h3>
               </div>
-            ) : (
-              <div className="space-y-3">
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {agentLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <Users className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">Agents will communicate here when you start a conversation</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
                 {agentLogs.map((log, idx) => (
                   <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/10 animate-fade-in">
                     <div className="flex items-center justify-between mb-1">
@@ -391,73 +397,117 @@ const VoiceAssistantWithAgents = () => {
                   </div>
                 ))}
                 <div ref={agentLogsEndRef} />
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </Card>
         </div>
       </div>
 
-      {/* Voice Control & Text Input */}
+      {/* Compact Voice Control & Text Input */}
       <div className="fixed bottom-0 left-0 right-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 pb-8">
-          <Card className="backdrop-blur-2xl bg-black/40 border-white/20 p-6 shadow-2xl">
-            <div className="space-y-4">
-              {/* Text Input Row */}
+        <div className="max-w-7xl mx-auto px-6 pb-4">
+          <Card className={`backdrop-blur-2xl bg-black/40 border-white/20 shadow-2xl transition-all duration-300 ${
+            isMinimized ? 'p-2' : 'p-4'
+          }`}>
+            {!isMinimized ? (
+              /* Expanded Mode */
               <div className="flex gap-3 items-center">
+                {/* Text Input */}
                 <Input
                   value={textMessage}
                   onChange={(e) => setTextMessage(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && handleSendTextMessage()}
-                  placeholder="Type your message here..."
-                  className="flex-1 bg-white/10 text-white border-white/20 placeholder:text-slate-400"
+                  placeholder="Type or use voice..."
+                  className="flex-1 bg-white/10 text-white border-white/20 placeholder:text-slate-400 h-12"
                   disabled={processing}
                 />
+
+                {/* Send Button */}
                 <Button
                   onClick={handleSendTextMessage}
                   disabled={processing || !textMessage.trim()}
-                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600"
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 h-12 px-4"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-5 h-5" />
+                </Button>
+
+                {/* Mic Button */}
+                <Button
+                  size="lg"
+                  disabled={processing || isSpeaking}
+                  onClick={isListening ? stopListening : startListening}
+                  className={`h-12 w-12 rounded-full ${
+                    isListening
+                      ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse'
+                      : 'bg-gradient-to-br from-cyan-500 to-blue-500'
+                  } shadow-lg`}
+                  title={isListening ? 'Stop listening' : 'Start voice input'}
+                >
+                  {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                </Button>
+
+                {/* Stop Speaking Button */}
+                {isSpeaking && (
+                  <Button
+                    onClick={stopSpeaking}
+                    className="h-12 w-12 rounded-full bg-gradient-to-br from-orange-500 to-red-500 shadow-lg"
+                    title="Stop speaking"
+                  >
+                    <span className="text-lg">⏸️</span>
+                  </Button>
+                )}
+
+                {/* Minimize Button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMinimized(true)}
+                  className="text-white hover:bg-white/10 h-12 px-3"
+                  title="Minimize"
+                >
+                  <span className="text-xs">▼</span>
+                </Button>
+
+                {/* Status Indicator */}
+                <div className="hidden lg:flex items-center gap-2 pl-3 border-l border-white/20">
+                  <div className={`w-2 h-2 rounded-full ${
+                    isListening ? 'bg-red-500 animate-pulse' :
+                    isSpeaking ? 'bg-orange-500 animate-pulse' :
+                    processing ? 'bg-yellow-500 animate-pulse' :
+                    'bg-green-500'
+                  }`} />
+                  <span className="text-xs text-slate-300">
+                    {isListening ? 'Listening' : isSpeaking ? 'Speaking' : processing ? 'Processing' : 'Ready'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* Minimized Mode - Floating at bottom right */
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMinimized(false)}
+                  className="text-white hover:bg-white/10 text-xs"
+                >
+                  Expand ▲
+                </Button>
+
+                <Button
+                  size="sm"
+                  disabled={processing || isSpeaking}
+                  onClick={isListening ? stopListening : startListening}
+                  className={`h-10 w-10 rounded-full ${
+                    isListening
+                      ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse'
+                      : 'bg-gradient-to-br from-cyan-500 to-blue-500'
+                  } shadow-lg`}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
                 </Button>
               </div>
-              
-              {/* Voice Control Row */}
-              <div className="flex items-center justify-between">
-                <div className="text-left">
-                  <p className="text-lg font-semibold text-white mb-1">
-                    {isListening ? '🎤 Listening...' : isSpeaking ? '🔊 Speaking...' : processing ? '⚙️ Processing...' : '✅ Ready'}
-                  </p>
-                  <p className="text-sm text-slate-400">
-                    {isListening ? 'Speak clearly' : isSpeaking ? 'Playing response' : processing ? 'Agents working...' : 'Type or click mic'}
-                  </p>
-                </div>
-
-                <div className="flex gap-4">
-                  <Button
-                    size="lg"
-                    disabled={processing || isSpeaking}
-                    onClick={isListening ? stopListening : startListening}
-                    className={`w-20 h-20 rounded-full ${
-                      isListening
-                        ? 'bg-gradient-to-br from-red-500 to-pink-500 animate-pulse'
-                        : 'bg-gradient-to-br from-cyan-500 to-blue-500'
-                    } shadow-2xl`}
-                  >
-                    {isListening ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8" />}
-                  </Button>
-                  
-                  {isSpeaking && (
-                    <Button
-                      size="lg"
-                      onClick={stopSpeaking}
-                      className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-500 to-red-500"
-                    >
-                      ⏸️
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </div>
+            )}
           </Card>
         </div>
       </div>

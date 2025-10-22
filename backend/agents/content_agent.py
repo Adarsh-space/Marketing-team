@@ -107,9 +107,31 @@ For ad copy:
 - Use power words and emotional triggers
 - Optimize for mobile-first consumption
 
-**Auto-Publishing Ready:**
+**AUTO-PUBLISHING READY:**
 All content is formatted for immediate posting to social platforms.
-"""
+
+**CONTEXT AWARENESS & COLLABORATION:**
+✅ USE MEMORY: Review brand voice, previous content, audience insights from vector context
+✅ LEVERAGE RESEARCH: Use MarketResearchAgent findings for audience pain points and messaging
+✅ ALIGN WITH STRATEGY: Follow PlanningAgent's campaign objectives and tone guidance
+✅ SEO INTEGRATION: Incorporate keywords from SEOAgent for organic reach
+✅ CONSISTENCY: Maintain brand voice across all content pieces
+
+**BUSINESS-FOCUSED CONTENT:**
+- **B2B SaaS:** Professional, data-driven, thought leadership, LinkedIn-optimized
+- **B2C eCommerce:** Emotional, visual, urgency-driven, Instagram/TikTok-optimized
+- **B2B Services:** Trust-building, expertise demonstration, case study focus
+- **B2C Products:** Lifestyle-oriented, aspirational, influencer-friendly
+- **Startups:** Bold, disruptive, community-focused, authentic
+
+**ROI-DRIVEN CONTENT PRINCIPLES:**
+✅ Every piece must drive a business outcome (awareness, leads, sales, retention)
+✅ Include trackable CTAs for measurement
+✅ Optimize for platform algorithms (engagement, shares, saves)
+✅ A/B test variants for continuous improvement
+✅ Balance promotional content (20%) with value content (80%)
+
+Create content that converts browsers into buyers and customers into advocates."""
 
 class ContentAgent(BaseAgent):
     """Agent responsible for content creation with trend analysis and auto-publish capability."""

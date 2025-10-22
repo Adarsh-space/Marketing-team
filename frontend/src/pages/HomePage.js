@@ -162,42 +162,50 @@ const HomePage = () => {
     {
       icon: <Target className="w-8 h-8" />,
       title: "Strategic Planning",
-      description: "AI-powered campaign strategies tailored to your goals"
+      description: "AI-powered campaign strategies tailored to your goals",
+      agentId: "PlanningAgent"
     },
     {
       icon: <TrendingUp className="w-8 h-8" />,
       title: "Market Research",
-      description: "Deep insights into your target audience and competitors"
+      description: "Deep insights into your target audience and competitors",
+      agentId: "MarketResearchAgent"
     },
     {
       icon: <Sparkles className="w-8 h-8" />,
       title: "Content Creation",
-      description: "Generate compelling marketing content automatically"
+      description: "Generate compelling marketing content automatically",
+      agentId: "ContentAgent"
     },
     {
       icon: <Mail className="w-8 h-8" />,
       title: "Email Marketing",
-      description: "Personalized email campaigns that convert"
+      description: "Personalized email campaigns that convert",
+      agentId: "EmailAgent"
     },
     {
       icon: <Share2 className="w-8 h-8" />,
       title: "Social Media",
-      description: "Multi-platform social media management"
+      description: "Multi-platform social media management",
+      agentId: "SocialMediaAgent"
     },
     {
       icon: <Search className="w-8 h-8" />,
       title: "SEO Optimization",
-      description: "Improve your search rankings organically"
+      description: "Improve your search rankings organically",
+      agentId: "SEOAgent"
     },
     {
       icon: <DollarSign className="w-8 h-8" />,
       title: "PPC Advertising",
-      description: "Maximize ROI with optimized paid campaigns"
+      description: "Maximize ROI with optimized paid campaigns",
+      agentId: "PPCAgent"
     },
     {
       icon: <BarChart3 className="w-8 h-8" />,
       title: "Analytics & Reporting",
-      description: "Real-time insights and performance tracking"
+      description: "Real-time insights and performance tracking",
+      agentId: "AnalyticsAgent"
     }
   ];
 
@@ -335,16 +343,21 @@ const HomePage = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {features.map((feature, index) => (
-              <Card 
-                key={index} 
-                className="p-6 glass border-white/30 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300"
+              <Card
+                key={index}
+                className="p-6 glass border-white/30 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group"
                 data-testid={`feature-card-${index}`}
+                onClick={() => navigate(`/agents?agent=${feature.agentId}`)}
               >
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mb-4 text-white shadow-lg shadow-cyan-500/30">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center mb-4 text-white shadow-lg shadow-cyan-500/30 group-hover:scale-110 transition-transform">
                   {feature.icon}
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-slate-800">{feature.title}</h3>
+                <h3 className="text-lg font-semibold mb-2 text-slate-800 group-hover:text-cyan-600 transition-colors">{feature.title}</h3>
                 <p className="text-sm text-slate-600 leading-relaxed">{feature.description}</p>
+                <div className="mt-3 flex items-center text-cyan-600 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span>Talk to Agent</span>
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </div>
               </Card>
             ))}
           </div>

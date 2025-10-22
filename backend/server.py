@@ -604,43 +604,92 @@ async def get_dashboard():
 @api_router.post("/agent-chat")
 async def agent_chat(data: Dict[str, Any]):
     """
-    Chat with individual agents directly.
+    Chat with individual agents directly with vector memory context.
     """
     try:
         agent_id = data.get("agent_id")
         message = data.get("message")
-        
+        user_id = data.get("user_id", "default_user")
+        conversation_id = data.get("conversation_id", str(uuid.uuid4()))
+
         # Get the specific agent
         agent = orchestrator.agents.get(agent_id)
-        
+
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
-        
-        # Prepare task payload based on agent type
+
+        # Get or create tenant for this user
+        await vector_memory.get_or_create_tenant(user_id)
+
+        # Store user message in vector memory
+        await vector_memory.store_memory(
+            user_id=user_id,
+            content=message,
+            memory_type="user_message",
+            agent_name=agent_id,
+            metadata={"conversation_id": conversation_id}
+        )
+
+        # Get relevant context from vector memory for this specific agent
+        context = await vector_memory.get_context_for_agent(
+            user_id=user_id,
+            agent_name=agent_id,
+            query=message
+        )
+
+        # Publish collaboration event
+        await collaboration_system.publish_event(
+            agent_name=agent_id,
+            event_type="task_started",
+            data={"task": "direct_chat", "message": message[:100]},
+            user_id=user_id,
+            conversation_id=conversation_id
+        )
+
+        # Prepare task payload with vector context
         task_payload = {
             "task_id": "direct_chat",
             "user_message": message,
+            "vector_context": context,  # Add vector context
             "campaign_brief": {"product": "User inquiry", "target_audience": "General"},
             "previous_results": {}
         }
-        
-        # Execute agent with message
+
+        # Execute agent with message and context
         result = await agent.execute(task_payload)
-        
+
         # Extract response string from result
         agent_result = result.get("result", {})
-        
+
         # Handle different response formats
         if isinstance(agent_result, dict):
-            response_text = agent_result.get("response", 
+            response_text = agent_result.get("response",
                            agent_result.get("raw_research",
                            agent_result.get("generated_content",
                            str(agent_result))))
         else:
             response_text = str(agent_result)
-        
+
+        # Store agent response in vector memory
+        await vector_memory.store_memory(
+            user_id=user_id,
+            content=response_text,
+            memory_type="agent_response",
+            agent_name=agent_id,
+            metadata={"conversation_id": conversation_id}
+        )
+
+        # Publish completion event
+        await collaboration_system.publish_event(
+            agent_name=agent_id,
+            event_type="task_completed",
+            data={"task": "direct_chat"},
+            user_id=user_id,
+            conversation_id=conversation_id
+        )
+
         return {"response": response_text}
-        
+
     except HTTPException:
         raise
     except Exception as e:
