@@ -605,6 +605,7 @@ async def get_dashboard():
 async def agent_chat(data: Dict[str, Any]):
     """
     Chat with individual agents directly with vector memory context.
+    Returns natural conversation instead of JSON.
     """
     try:
         agent_id = data.get("agent_id")
