@@ -27,14 +27,23 @@ When given marketing context, create a detailed prompt for video generation.
 """
 
 class MultiModelVideoAgent(BaseAgent):
-    """Agent responsible for generating videos using OpenAI Sora."""
+    """
+    Agent responsible for generating videos using multiple AI models.
+    Supports: OpenAI Sora, Runway Gen-3, Luma Dream Machine, Stability AI
+    """
     
     def __init__(self):
         super().__init__(
-            agent_name="SoraVideoAgent",
+            agent_name="MultiModelVideoAgent",
             system_prompt=VIDEO_GENERATION_SYSTEM_PROMPT,
             model="gpt-4o"
         )
+        self.supported_models = {
+            "sora": "OpenAI Sora (HD, up to 20s)",
+            "runway-gen3": "Runway Gen-3 Alpha Turbo (720p/1080p, 5-10s)",
+            "luma-dream": "Luma Dream Machine (1080p, up to 10s)",
+            "stability": "Stability AI Stable Video (1024x576, ~2s)"
+        }
     
     async def generate_video_from_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """
