@@ -14,7 +14,7 @@ const ImageTestPage = () => {
   const [error, setError] = useState(null);
 
   const testImageGeneration = async () => {
-    try:
+    try {
       setLoading(true);
       setError(null);
       console.log("Requesting image...");
