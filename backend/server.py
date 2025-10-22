@@ -678,10 +678,12 @@ async def agent_chat(data: Dict[str, Any]):
         # Detect image generation requests
         image_keywords = ["create image", "generate image", "make image", "design image",
                          "create visual", "generate visual", "create graphic", "generate graphic",
-                         "create picture", "show me image", "create post image"]
+                         "create picture", "show me image", "create post", "generate post",
+                         "make post", "design post", "create poster", "make poster", "design poster"]
 
         video_keywords = ["create video", "generate video", "make video", "design video",
-                         "create clip", "video concept", "video storyboard"]
+                         "create clip", "video concept", "video storyboard", "make clip",
+                         "create reel", "make reel", "video script"]
 
         message_lower = message.lower()
 
