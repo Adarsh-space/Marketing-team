@@ -142,3 +142,65 @@ Create a detailed cinematic video prompt for professional marketing video.
                 "error": str(e),
                 "message": f"Failed to generate video: {str(e)}"
             }
+    
+    async def _try_sora(self, prompt: str, duration: int, resolution: str) -> Dict[str, Any]:
+        """Try generating video with OpenAI Sora"""
+        try:
+            from emergentintegrations.llm.openai.video_generation import OpenAIVideoGeneration
+            
+            api_key = os.environ.get('EMERGENT_LLM_KEY')
+            if not api_key:
+                raise Exception("EMERGENT_LLM_KEY not configured")
+            
+            video_gen = OpenAIVideoGeneration(api_key=api_key)
+            videos = await video_gen.generate_video(
+                prompt=prompt,
+                model="sora-2",
+                duration=duration,
+                resolution=resolution
+            )
+            
+            if videos and len(videos) > 0:
+                video_base64 = base64.b64encode(videos[0]).decode('utf-8')
+                return {
+                    "status": "success",
+                    "video_base64": video_base64,
+                    "prompt_used": prompt,
+                    "duration": duration,
+                    "resolution": resolution,
+                    "message": "Video generated with Sora!"
+                }
+            raise Exception("No video generated")
+            
+        except ImportError:
+            raise Exception("Sora SDK not available")
+    
+    async def _try_runway(self, prompt: str, duration: int, resolution: str) -> Dict[str, Any]:
+        """Try generating video with Runway Gen-3"""
+        runway_key = os.environ.get('RUNWAY_API_KEY')
+        if not runway_key:
+            raise Exception("RUNWAY_API_KEY not configured")
+        
+        # Runway Gen-3 implementation would go here
+        # For now, raise exception to try next model
+        raise Exception("Runway integration not yet implemented. Add API key to enable.")
+    
+    async def _try_luma(self, prompt: str, duration: int, resolution: str) -> Dict[str, Any]:
+        """Try generating video with Luma Dream Machine"""
+        luma_key = os.environ.get('LUMA_API_KEY')
+        if not luma_key:
+            raise Exception("LUMA_API_KEY not configured")
+        
+        # Luma Dream Machine implementation would go here
+        # For now, raise exception to try next model
+        raise Exception("Luma integration not yet implemented. Add API key to enable.")
+    
+    async def _try_stability(self, prompt: str, duration: int, resolution: str) -> Dict[str, Any]:
+        """Try generating video with Stability AI"""
+        stability_key = os.environ.get('STABILITY_API_KEY')
+        if not stability_key:
+            raise Exception("STABILITY_API_KEY not configured")
+        
+        # Stability AI implementation would go here
+        # For now, raise exception to try next model
+        raise Exception("Stability AI integration not yet implemented. Add API key to enable.")
