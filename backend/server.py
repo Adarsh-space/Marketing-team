@@ -661,14 +661,9 @@ async def agent_chat(data: Dict[str, Any]):
         # Extract response string from result
         agent_result = result.get("result", {})
 
-        # Handle different response formats
-        if isinstance(agent_result, dict):
-            response_text = agent_result.get("response",
-                           agent_result.get("raw_research",
-                           agent_result.get("generated_content",
-                           str(agent_result))))
-        else:
-            response_text = str(agent_result)
+        # Clean the response to natural language
+        from utils.response_formatter import clean_agent_response
+        response_text = clean_agent_response(agent_result)
 
         # Store agent response in vector memory
         await vector_memory.store_memory(
