@@ -78,32 +78,68 @@ const ImageTestPage = () => {
   return (
     <div className="min-h-screen p-8 bg-gray-100">
       <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow">
-        <h1 className="text-2xl font-bold mb-4">Image Generation Test</h1>
+        <h1 className="text-2xl font-bold mb-6">Image & Video Generation Test</h1>
         
-        <Button 
-          onClick={testImageGeneration}
-          disabled={loading}
-          className="mb-4"
-        >
-          {loading ? "Generating..." : "Test Image Generation"}
-        </Button>
+        {/* Image Test Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-3">Image Generation (DALL-E)</h2>
+          <Button 
+            onClick={testImageGeneration}
+            disabled={loading}
+            className="mb-4"
+          >
+            {loading ? "Generating Image..." : "Test Image Generation"}
+          </Button>
+
+          {image && (
+            <div className="border p-4 rounded">
+              <p className="text-sm mb-2 text-green-600">✅ Image received ({image.length} chars) - HD Quality</p>
+              <img 
+                src={`data:image/png;base64,${image}`}
+                alt="Generated"
+                className="max-w-full rounded shadow-lg"
+                onLoad={() => console.log("Image loaded!")}
+                onError={(e) => console.error("Image load error:", e)}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Video Test Section */}
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-3">Video Generation (Sora)</h2>
+          <Button 
+            onClick={testVideoGeneration}
+            disabled={videoLoading}
+            className="mb-4 bg-purple-600 hover:bg-purple-700"
+          >
+            {videoLoading ? "Generating Video..." : "Test Video Generation"}
+          </Button>
+
+          {video && (
+            <div className="border p-4 rounded">
+              <p className="text-sm mb-2 text-green-600">✅ Video received ({video.length} chars) - 1080p</p>
+              <video 
+                src={`data:video/mp4;base64,${video}`}
+                controls
+                className="max-w-full rounded shadow-lg"
+                onLoadedData={() => console.log("Video loaded!")}
+                onError={(e) => console.error("Video load error:", e)}
+              />
+            </div>
+          )}
+
+          {videoConcept && (
+            <div className="border p-4 rounded bg-yellow-50">
+              <p className="text-sm mb-2 text-yellow-700">ℹ️ Sora API not available yet - Video Concept Generated:</p>
+              <div className="whitespace-pre-wrap text-sm">{videoConcept}</div>
+            </div>
+          )}
+        </div>
 
         {error && (
           <div className="p-4 bg-red-100 text-red-700 rounded mb-4">
             Error: {error}
-          </div>
-        )}
-
-        {image && (
-          <div className="border p-4 rounded">
-            <p className="text-sm mb-2">Image received ({image.length} chars)</p>
-            <img 
-              src={`data:image/png;base64,${image}`}
-              alt="Generated"
-              className="max-w-full rounded"
-              onLoad={() => console.log("Image loaded!")}
-              onError={(e) => console.error("Image load error:", e)}
-            />
           </div>
         )}
       </div>
