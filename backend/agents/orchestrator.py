@@ -16,6 +16,7 @@ from .analytics_agent import AnalyticsAgent
 from .reporting_agent import ReportingAgent
 from .image_generation_agent import ImageGenerationAgent
 from .video_generation_agent import VideoGenerationAgent
+from .sora_video_agent import SoraVideoAgent
 
 logger = logging.getLogger(__name__)
 
