@@ -121,13 +121,20 @@ const VoiceAssistant = () => {
       });
 
       const aiResponse = chatResponse.data.message;
-      
+      const imageData = chatResponse.data.image_base64;
+      const promptUsed = chatResponse.data.prompt_used;
+
       if (!conversationId) {
         setConversationId(chatResponse.data.conversation_id);
       }
 
-      // Add AI response
-      setMessages(prev => [...prev, { role: "assistant", content: aiResponse }]);
+      // Add AI response with image data if available
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: aiResponse,
+        image: imageData,
+        prompt: promptUsed
+      }]);
 
       // Speak the response
       speakText(aiResponse);
@@ -290,6 +297,25 @@ const VoiceAssistant = () => {
                       {msg.role === 'user' ? 'You' : 'AI Assistant'}
                     </p>
                     <p className="text-white leading-relaxed">{msg.content}</p>
+
+                    {/* Display image if available */}
+                    {msg.image && (
+                      <div className="mt-4">
+                        <p className="text-xs text-green-400 mb-2">Generated Image:</p>
+                        <img
+                          src={`data:image/png;base64,${msg.image}`}
+                          alt={msg.prompt || "Generated image"}
+                          className="rounded-lg max-w-full h-auto border-2 border-white/20 shadow-lg"
+                          onLoad={() => console.log('Image loaded successfully')}
+                          onError={(e) => console.error('Image failed to load:', e)}
+                        />
+                        {msg.prompt && (
+                          <p className="text-xs text-slate-400 mt-2 italic">
+                            Prompt: {msg.prompt}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>
