@@ -1,9 +1,11 @@
 from .base_agent import BaseAgent
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import base64
 import logging
 import os
 from dotenv import load_dotenv
+import httpx
+import asyncio
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -24,7 +26,7 @@ When given marketing context, create a detailed prompt for video generation.
 }
 """
 
-class SoraVideoAgent(BaseAgent):
+class MultiModelVideoAgent(BaseAgent):
     """Agent responsible for generating videos using OpenAI Sora."""
     
     def __init__(self):
