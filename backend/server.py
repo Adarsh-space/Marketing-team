@@ -799,11 +799,11 @@ async def generate_video(data: Dict[str, Any]):
                         if "website" in user_content.lower() or ".com" in user_content:
                             brand_info += f" {user_content}"
 
-        # Get SoraVideoAgent
-        sora_agent = orchestrator.agents.get("SoraVideoAgent")
+        # Get MultiModelVideoAgent
+        video_agent = orchestrator.agents.get("MultiModelVideoAgent")
         
-        if not sora_agent:
-            raise HTTPException(status_code=500, detail="Sora video generation agent not available")
+        if not video_agent:
+            raise HTTPException(status_code=500, detail="Video generation agent not available")
 
         # Generate video
         logger.info(f"Generating video for content: {content[:100]}...")
