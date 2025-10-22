@@ -224,7 +224,7 @@ const UnifiedAgentChat = () => {
 
       const aiResponse = response.data.response || "I'm processing your request...";
       const imageData = response.data.image_base64;
-      const videoData = response.data.video_url;
+      const videoConcept = response.data.video_concept;
       const promptUsed = response.data.prompt_used;
 
       // Add agent response
@@ -232,7 +232,7 @@ const UnifiedAgentChat = () => {
         role: "assistant",
         content: aiResponse,
         image: imageData,
-        video: videoData,
+        videoConcept: videoConcept,
         prompt: promptUsed,
         timestamp: Date.now()
       }]);
@@ -423,17 +423,33 @@ const UnifiedAgentChat = () => {
                       </div>
                     )}
 
-                    {/* Display video if available */}
-                    {msg.video && (
-                      <div className="mt-4">
-                        <p className="text-xs text-blue-400 mb-2 flex items-center gap-1">
-                          <Video className="w-4 h-4" /> Generated Video:
+                    {/* Display video concept if available */}
+                    {msg.videoConcept && (
+                      <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs text-blue-400 mb-3 flex items-center gap-1 font-semibold">
+                          <Video className="w-4 h-4" /> Video Concept Generated
                         </p>
-                        <video
-                          src={msg.video}
-                          controls
-                          className="rounded-lg max-w-full h-auto border-2 border-white/20 shadow-lg"
-                        />
+                        <div className="space-y-2 text-xs text-slate-300">
+                          {msg.videoConcept.video_concept && (
+                            <p><span className="font-semibold text-blue-300">Concept:</span> {msg.videoConcept.video_concept}</p>
+                          )}
+                          {msg.videoConcept.duration_seconds && (
+                            <p><span className="font-semibold text-blue-300">Duration:</span> {msg.videoConcept.duration_seconds}s</p>
+                          )}
+                          {msg.videoConcept.target_platform && (
+                            <p><span className="font-semibold text-blue-300">Platform:</span> {msg.videoConcept.target_platform.join(', ')}</p>
+                          )}
+                          {msg.videoConcept.scenes && msg.videoConcept.scenes.length > 0 && (
+                            <div className="mt-3">
+                              <p className="font-semibold text-blue-300 mb-2">Scenes:</p>
+                              {msg.videoConcept.scenes.slice(0, 3).map((scene, idx) => (
+                                <div key={idx} className="ml-2 mb-2 p-2 bg-black/20 rounded">
+                                  <p className="text-blue-200">Scene {scene.scene_number}: {scene.description?.substring(0, 100)}...</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
