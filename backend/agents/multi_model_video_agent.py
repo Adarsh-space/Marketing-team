@@ -101,52 +101,39 @@ Create a detailed cinematic video prompt for professional marketing video.
             
             logger.info(f"Generated video prompt: {video_prompt[:200]}...")
             
-            # Check if Sora is available
-            try:
-                from emergentintegrations.llm.openai.video_generation import OpenAIVideoGeneration
-                
-                api_key = os.environ.get('EMERGENT_LLM_KEY')
-                
-                # Generate video using Sora
-                logger.info("Generating video with Sora...")
-                video_gen = OpenAIVideoGeneration(api_key=api_key)
-                
-                # Generate video (this will use Sora when available)
-                videos = await video_gen.generate_video(
-                    prompt=video_prompt,
-                    model="sora-2",
-                    duration=duration,
-                    resolution=resolution
-                )
-                
-                if videos and len(videos) > 0:
-                    # Convert to base64
-                    video_base64 = base64.b64encode(videos[0]).decode('utf-8')
-                    
-                    logger.info("Video generated successfully!")
-                    
-                    return {
-                        "status": "success",
-                        "video_base64": video_base64,
-                        "prompt_used": video_prompt,
-                        "duration": duration,
-                        "resolution": resolution,
-                        "message": "Video generated successfully!"
-                    }
-                else:
-                    raise Exception("No video was generated")
-                    
-            except ImportError:
-                # Sora not available yet - return video concept
-                logger.warning("Sora API not available. Returning video concept only.")
-                return {
-                    "status": "concept_only",
-                    "video_concept": video_prompt,
-                    "duration": duration,
-                    "resolution": resolution,
-                    "message": "Sora API not available yet. Here's the video concept you can use with other video generation tools.",
-                    "note": "To actually generate videos, Sora API access is required"
-                }
+            # Try multiple video generation models in order of preference
+            models_to_try = [
+                ("sora", self._try_sora),
+                ("runway-gen3", self._try_runway),
+                ("luma-dream", self._try_luma),
+                ("stability", self._try_stability)
+            ]
+            
+            errors = []
+            for model_name, model_func in models_to_try:
+                try:
+                    logger.info(f"Attempting video generation with {model_name}...")
+                    result = await model_func(video_prompt, duration, resolution)
+                    if result.get("status") == "success":
+                        result["model_used"] = model_name
+                        return result
+                except Exception as e:
+                    error_msg = f"{model_name}: {str(e)}"
+                    errors.append(error_msg)
+                    logger.warning(f"Failed to generate video with {model_name}: {str(e)}")
+                    continue
+            
+            # All models failed - return concept
+            logger.warning("All video generation models unavailable. Returning video concept.")
+            return {
+                "status": "concept_only",
+                "video_concept": video_prompt,
+                "duration": duration,
+                "resolution": resolution,
+                "message": "Video generation APIs not available. Here's the professional video concept you can use with any video generation tool.",
+                "note": "Supported models: Sora, Runway Gen-3, Luma Dream Machine, Stability AI. All require API keys.",
+                "errors": errors
+            }
                 
         except Exception as e:
             logger.error(f"Error generating video: {str(e)}")
