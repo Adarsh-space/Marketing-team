@@ -807,7 +807,7 @@ async def generate_video(data: Dict[str, Any]):
 
         # Generate video
         logger.info(f"Generating video for content: {content[:100]}...")
-        result = await sora_agent.generate_video_from_context({
+        result = await video_agent.generate_video_from_context({
             "content": content,
             "brand_info": brand_info,
             "platform": platform,
