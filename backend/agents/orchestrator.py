@@ -41,9 +41,9 @@ class AgentOrchestrator:
             "ReportingAgent": ReportingAgent(),
             "ImageGenerationAgent": ImageGenerationAgent(),
             "VideoGenerationAgent": VideoGenerationAgent(),
-            "SoraVideoAgent": SoraVideoAgent()
+            "MultiModelVideoAgent": MultiModelVideoAgent()
         }
-        logger.info("AgentOrchestrator initialized with all agents including VideoGenerationAgent and SoraVideoAgent")
+        logger.info("AgentOrchestrator initialized with all agents including MultiModelVideoAgent (Sora, Runway, Luma, Stability)")
     
     async def process_user_message(
         self,
