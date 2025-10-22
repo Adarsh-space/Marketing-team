@@ -763,6 +763,64 @@ async def generate_image(data: Dict[str, Any]):
         logger.error(f"Image generation error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@api_router.post("/generate-video")
+async def generate_video(data: Dict[str, Any]):
+    """
+    Generate marketing video concept using AI.
+
+    Expected data:
+    {
+        "content": "Marketing message/product description",
+        "brand_info": "Brand information (optional)",
+        "platform": "Target platform like TikTok, Instagram Reels, YouTube",
+        "duration": Duration in seconds (15, 30, 60),
+        "style": "Video style preference",
+        "goal": "Campaign goal (awareness, conversions, engagement)"
+    }
+    """
+    try:
+        content = data.get("content", "")
+        brand_info = data.get("brand_info", "")
+        platform = data.get("platform", "Instagram Reels")
+        duration = data.get("duration", 30)
+        style = data.get("style", "modern and engaging")
+        goal = data.get("goal", "engagement")
+
+        # Import VideoGenerationAgent
+        from agents.video_generation_agent import VideoGenerationAgent
+
+        video_agent = VideoGenerationAgent()
+
+        # Generate video concept
+        logger.info(f"Generating video concept for: {content[:100]}...")
+        result = await video_agent.generate_video_concept({
+            "content": content,
+            "brand_info": brand_info,
+            "platform": platform,
+            "duration": duration,
+            "style": style,
+            "goal": goal
+        })
+
+        if "error" not in result:
+            return {
+                "status": "success",
+                "video_concept": result,
+                "message": "Video concept generated successfully!",
+                "note": "This is a video concept/storyboard. Actual video rendering requires external video AI service."
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("details", "Video generation failed")
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Video generation error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Settings Endpoints ====================
 
 @api_router.get("/settings")
