@@ -690,7 +690,6 @@ async def agent_chat(data: Dict[str, Any]):
         # Generate image if requested
         if any(keyword in message_lower for keyword in image_keywords):
             try:
-                logger.info("Image generation requested, generating...")
                 image_agent = orchestrator.agents.get("ImageGenerationAgent")
                 if image_agent:
                     img_result = await image_agent.generate_image_from_context({
@@ -701,14 +700,18 @@ async def agent_chat(data: Dict[str, Any]):
                     if img_result.get("status") == "success":
                         image_base64 = img_result.get("image_base64")
                         prompt_used = img_result.get("prompt_used")
-                        logger.info(f"Image generated successfully, size: {len(image_base64) if image_base64 else 0}")
+                    else:
+                        # Image generation failed, append error to response
+                        error_msg = img_result.get("message", "Image generation failed")
+                        response_text += f"\n\n[Error: {error_msg}]"
+                else:
+                    response_text += "\n\n[Error: ImageGenerationAgent not found]"
             except Exception as e:
-                logger.error(f"Image generation error: {str(e)}")
+                response_text += f"\n\n[Error generating image: {str(e)}]"
 
         # Generate video concept if requested
         elif any(keyword in message_lower for keyword in video_keywords):
             try:
-                logger.info("Video generation requested, generating concept...")
                 from agents.video_generation_agent import VideoGenerationAgent
                 video_agent = VideoGenerationAgent()
                 video_result = await video_agent.generate_video_concept({
@@ -720,9 +723,11 @@ async def agent_chat(data: Dict[str, Any]):
                 })
                 if "error" not in video_result:
                     video_concept = video_result
-                    logger.info("Video concept generated successfully")
+                else:
+                    error_msg = video_result.get("details", "Video generation failed")
+                    response_text += f"\n\n[Error: {error_msg}]"
             except Exception as e:
-                logger.error(f"Video generation error: {str(e)}")
+                response_text += f"\n\n[Error generating video: {str(e)}]"
 
         # Store agent response in vector memory
         await vector_memory.store_memory(
