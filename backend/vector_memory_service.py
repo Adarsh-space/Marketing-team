@@ -320,29 +320,31 @@ class VectorMemoryService:
         user_id: str,
         agent_name: str,
         query: str,
-        max_memories: int = 5
+        max_memories: int = 5,
+        include_other_agents: bool = True
     ) -> str:
         """
         Get relevant context for an agent to use in its reasoning.
         Searches user, agent, and global memories.
+        Optionally includes cross-agent knowledge retrieval.
         """
         try:
             context_parts = []
-            
-            # Search user memories
+
+            # Search user memories (most important)
             user_memories = await self.search_memories(
                 user_id=user_id,
                 query=query,
                 limit=max_memories,
                 scope="user"
             )
-            
+
             if user_memories:
                 context_parts.append("**User Context:**")
                 for mem in user_memories:
                     context_parts.append(f"- {mem.get('content')}")
-            
-            # Search agent-specific memories
+
+            # Search this agent's specific memories
             agent_memories = await self.search_memories(
                 user_id=user_id,
                 query=query,
@@ -350,12 +352,31 @@ class VectorMemoryService:
                 scope="agent",
                 agent_name=agent_name
             )
-            
+
             if agent_memories:
                 context_parts.append(f"\n**{agent_name} Memories:**")
                 for mem in agent_memories:
                     context_parts.append(f"- {mem.get('content')}")
-            
+
+            # Cross-agent knowledge retrieval (NEW!)
+            # Search ALL agent memories without filtering by agent_name
+            if include_other_agents:
+                other_agent_memories = await self.search_memories(
+                    user_id=user_id,
+                    query=query,
+                    limit=3,
+                    scope="agent"
+                    # No agent_name filter - searches across ALL agents
+                )
+
+                if other_agent_memories:
+                    context_parts.append("\n**Insights from Other Agents:**")
+                    for mem in other_agent_memories:
+                        mem_agent = mem.get('agent_name', 'Unknown')
+                        # Skip if it's from this agent (already added above)
+                        if mem_agent != agent_name:
+                            context_parts.append(f"- [{mem_agent}] {mem.get('content')}")
+
             # Search global memories (best practices, guidelines)
             global_memories = await self.search_memories(
                 user_id=user_id,
@@ -363,14 +384,14 @@ class VectorMemoryService:
                 limit=2,
                 scope="global"
             )
-            
+
             if global_memories:
                 context_parts.append("\n**Global Knowledge:**")
                 for mem in global_memories:
                     context_parts.append(f"- {mem.get('content')}")
-            
+
             return "\n".join(context_parts) if context_parts else ""
-            
+
         except Exception as e:
             logger.error(f"Error getting agent context: {str(e)}")
             return ""

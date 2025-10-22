@@ -35,6 +35,19 @@ const AgentChatPage = () => {
   const synthRef = useRef(null);
   const messagesEndRef = useRef(null);
 
+  // Auto-select agent from URL parameter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const agentId = params.get('agent');
+    if (agentId) {
+      const agent = AGENTS.find(a => a.id === agentId);
+      if (agent) {
+        setSelectedAgent(agent);
+        toast.success(`Connected to ${agent.name}`);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);

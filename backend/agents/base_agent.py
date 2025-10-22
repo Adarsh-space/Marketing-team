@@ -64,9 +64,26 @@ class BaseAgent:
     def _prepare_prompt(self, task_payload: Dict[str, Any]) -> str:
         """
         Prepare the prompt for the LLM based on task payload.
+        Includes vector memory context by default.
         Override in subclasses for agent-specific logic.
         """
-        return json.dumps(task_payload, indent=2)
+        # Extract vector context if available
+        vector_context = task_payload.get('vector_context', '')
+
+        # Build prompt with context
+        prompt_parts = []
+
+        # Add vector memory context (if available)
+        if vector_context:
+            prompt_parts.append("📝 RELEVANT CONTEXT FROM MEMORY:")
+            prompt_parts.append(vector_context)
+            prompt_parts.append("\n⚠️ Use this context to provide better responses!\n")
+
+        # Add main task payload
+        prompt_parts.append("TASK DETAILS:")
+        prompt_parts.append(json.dumps(task_payload, indent=2))
+
+        return "\n\n".join(prompt_parts)
     
     def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
         """
