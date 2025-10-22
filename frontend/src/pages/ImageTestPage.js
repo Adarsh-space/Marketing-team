@@ -7,11 +7,14 @@ const API = `${BACKEND_URL}/api`;
 
 const ImageTestPage = () => {
   const [image, setImage] = useState(null);
+  const [video, setVideo] = useState(null);
+  const [videoConcept, setVideoConcept] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [videoLoading, setVideoLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const testImageGeneration = async () => {
-    try {
+    try:
       setLoading(true);
       setError(null);
       console.log("Requesting image...");
@@ -36,6 +39,39 @@ const ImageTestPage = () => {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const testVideoGeneration = async () => {
+    try {
+      setVideoLoading(true);
+      setError(null);
+      console.log("Requesting video...");
+      
+      const response = await axios.post(`${API}/generate-video`, {
+        content: "Dynamic marketing video for a tech startup showcasing innovation",
+        duration: 10,
+        resolution: "1080p"
+      }, {
+        timeout: 120000 // 2 minutes for video
+      });
+
+      console.log("Video response received:", response.data);
+      
+      if (response.data.status === "success" && response.data.video_base64) {
+        console.log("Video data length:", response.data.video_base64.length);
+        setVideo(response.data.video_base64);
+      } else if (response.data.status === "concept_only") {
+        console.log("Sora not available, showing concept");
+        setVideoConcept(response.data.video_concept);
+      } else {
+        setError("No video in response");
+      }
+    } catch (err) {
+      console.error("Error:", err);
+      setError(err.message);
+    } finally {
+      setVideoLoading(false);
     }
   };
 
