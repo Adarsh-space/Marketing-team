@@ -52,11 +52,11 @@ const HomePage = () => {
     // Load supported languages
     loadLanguages();
     
-    // Check if redirected from HubSpot OAuth
+    // Check if redirected from Zoho OAuth
     const params = new URLSearchParams(window.location.search);
-    if (params.get('hubspot_connected') === 'true') {
-      toast.success('HubSpot connected successfully!');
-      setHubspotConnected(true);
+    if (params.get('zoho_connected') === 'true') {
+      toast.success('Zoho connected successfully!');
+      setZohoConnected(true);
       // Clean URL
       window.history.replaceState({}, '', '/');
     }
