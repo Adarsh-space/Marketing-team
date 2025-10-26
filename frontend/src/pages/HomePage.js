@@ -223,20 +223,20 @@ const HomePage = () => {
             </h1>
           </div>
           <div className="flex items-center gap-4">
-            {hubspotConnected ? (
-              <Badge className="bg-green-100 text-green-700 border-green-200" data-testid="hubspot-status-badge">
+            {zohoConnected ? (
+              <Badge className="bg-green-100 text-green-700 border-green-200" data-testid="zoho-status-badge">
                 <Check className="w-3 h-3 mr-1" />
-                HubSpot Connected
+                Zoho Connected
               </Badge>
             ) : (
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={handleConnectHubSpot}
+                onClick={() => navigate('/zoho-connections')}
                 className="border-cyan-200 hover:bg-cyan-50"
-                data-testid="connect-hubspot-btn"
+                data-testid="connect-zoho-btn"
               >
-                Connect HubSpot
+                Connect Zoho
               </Button>
             )}
             <Button 
