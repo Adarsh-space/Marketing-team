@@ -24,6 +24,11 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
+    # Create stub types when LangChain not available
+    BaseMessage = Any
+    HumanMessage = Any
+    SystemMessage = Any
+    AIMessage = Any
     logging.warning("LangChain/LangGraph not installed. Install with: pip install langchain langchain-openai langgraph")
 
 logger = logging.getLogger(__name__)
