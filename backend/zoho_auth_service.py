@@ -56,9 +56,9 @@ class ZohoAuthService:
             redirect_uri: OAuth redirect URI
         """
         self.db = db
-        self.client_id = client_id or os.environ.get('ZOHO_CLIENT_ID')
-        self.client_secret = client_secret or os.environ.get('ZOHO_CLIENT_SECRET')
-        self.redirect_uri = redirect_uri or os.environ.get('ZOHO_REDIRECT_URI')
+        self.client_id = client_id or os.environ.get('1000.0STI7LZA4JR3MKKB6DZ5VW8RQFE29I')
+        self.client_secret = client_secret or os.environ.get('2a03beb22d98f288cf36be968fc3a0ee20fae804ce')
+        self.redirect_uri = redirect_uri or os.environ.get('http://localhost:8000/zoho/callback')
 
         if not all([self.client_id, self.client_secret, self.redirect_uri]):
             logger.warning(
