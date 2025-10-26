@@ -89,14 +89,7 @@ const HomePage = () => {
     }
   };
 
-  const handleConnectHubSpot = async () => {
-    try {
-      const response = await axios.get(`${API}/oauth/hubspot/authorize`);
-      window.location.href = response.data.authorization_url;
-    } catch (error) {
-      toast.error('Failed to connect HubSpot');
-    }
-  };
+  // Zoho connection is now handled through /zoho-connections page
 
   const handleSendMessage = async (textOverride = null) => {
     const textToSend = textOverride || message;
