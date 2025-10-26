@@ -6,7 +6,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { CheckCircle2, XCircle, RefreshCw, Link as LinkIcon, Unlink } from "lucide-react";
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000/api';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const API_URL = `${BACKEND_URL}/api`;
 
 const ZohoConnectionsPage = () => {
   const [connected, setConnected] = useState(false);
