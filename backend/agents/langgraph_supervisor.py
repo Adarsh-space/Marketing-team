@@ -29,6 +29,13 @@ except ImportError:
     HumanMessage = Any
     SystemMessage = Any
     AIMessage = Any
+    ChatPromptTemplate = Any
+    MessagesPlaceholder = Any
+    StateGraph = Any
+    END = None
+    START = None
+    ChatOpenAI = Any
+    MemorySaver = Any
     logging.warning("LangChain/LangGraph not installed. Install with: pip install langchain langchain-openai langgraph")
 
 logger = logging.getLogger(__name__)
