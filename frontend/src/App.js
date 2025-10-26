@@ -9,6 +9,7 @@ import UnifiedAgentChat from "@/pages/UnifiedAgentChat";
 import SettingsPage from "@/pages/SettingsPage";
 import AgentChatPage from "@/pages/AgentChatPage";
 import ImageTestPage from "@/pages/ImageTestPage";
+import TaskManagementPage from "@/pages/TaskManagementPage";
 import "@/App.css";
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route path="/campaign/:campaignId" element={<CampaignPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/test-image" element={<ImageTestPage />} />
+          <Route path="/task-management" element={<TaskManagementPage />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />

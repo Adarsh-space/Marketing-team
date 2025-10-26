@@ -1,0 +1,15 @@
+# Canva OAuth 2.0 Integration - Python Dependencies
+
+# Web framework
+Flask==3.0.0
+
+# HTTP requests library
+requests==2.31.0
+
+# Environment variable management (optional but recommended)
+python-dotenv==1.0.0
+
+# Security utilities (already included in Python 3.6+)
+# secrets - built-in
+# hashlib - built-in
+# base64 - built-in

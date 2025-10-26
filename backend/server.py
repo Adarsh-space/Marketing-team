@@ -16,6 +16,7 @@ import io
 
 # Import agent orchestrator, voice service, social media service, vector memory, and collaboration system
 from agents.orchestrator import AgentOrchestrator
+from agents.integrated_supervisor import IntegratedSupervisor
 from voice_service import VoiceService
 from social_media_service import SocialMediaService
 from vector_memory_service import VectorMemoryService
@@ -53,7 +54,7 @@ async def initialize_database():
         # Collections to create
         required_collections = [
             "conversations",
-            "campaigns", 
+            "campaigns",
             "user_memory",
             "agent_memory",
             "global_memory",
@@ -62,7 +63,8 @@ async def initialize_database():
             "agent_tasks",
             "hubspot_tokens",
             "settings",
-            "published_content"
+            "published_content",
+            "approval_requests"  # New collection for approval workflow
         ]
         
         # Create missing collections
@@ -94,6 +96,7 @@ async def initialize_database():
 
 # Initialize services
 orchestrator = AgentOrchestrator(db)
+integrated_supervisor = IntegratedSupervisor(db)  # New integrated supervisor
 voice_service = VoiceService()
 social_media_service = SocialMediaService()
 vector_memory = VectorMemoryService(db)
@@ -1132,6 +1135,141 @@ async def get_supported_languages():
         "languages": voice_service.SUPPORTED_LANGUAGES,
         "voices": voice_service.AVAILABLE_VOICES
     }
+
+# ==================== Approval Workflow Endpoints ====================
+
+@api_router.post("/integrated/chat")
+async def integrated_chat(message: ChatMessage):
+    """
+    Process user message through integrated supervisor system.
+    Uses LangChain multi-agent system for complex tasks.
+    """
+    try:
+        user_id = message.user_id or "default_user"
+        conversation_id = message.conversation_id or str(uuid.uuid4())
+
+        # Get or create tenant
+        await vector_memory.get_or_create_tenant(user_id)
+
+        # Store user message
+        await vector_memory.store_memory(
+            user_id=user_id,
+            content=message.message,
+            memory_type="user_message",
+            metadata={"conversation_id": conversation_id}
+        )
+
+        # Process with integrated supervisor
+        result = await integrated_supervisor.process_request(
+            user_request=message.message,
+            conversation_id=conversation_id,
+            use_langchain=True
+        )
+
+        # Store agent response
+        if result.get("type") != "error":
+            await vector_memory.store_memory(
+                user_id=user_id,
+                content=str(result.get("result", "")),
+                memory_type="agent_response",
+                metadata={"conversation_id": conversation_id}
+            )
+
+        return {
+            **result,
+            "conversation_id": conversation_id
+        }
+
+    except Exception as e:
+        logger.error(f"Integrated chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/approvals/pending")
+async def get_pending_approvals(conversation_id: Optional[str] = None):
+    """
+    Get all pending approval requests.
+    """
+    try:
+        approvals = await integrated_supervisor.get_pending_approvals(conversation_id)
+        return {
+            "status": "success",
+            "approvals": approvals,
+            "count": len(approvals)
+        }
+    except Exception as e:
+        logger.error(f"Error getting pending approvals: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/approvals/{request_id}/approve")
+async def approve_request(request_id: str, data: Optional[Dict[str, Any]] = None):
+    """
+    Approve a pending request.
+    """
+    try:
+        notes = data.get("notes") if data else None
+        result = await integrated_supervisor.approve_request(request_id, notes)
+        return result
+    except Exception as e:
+        logger.error(f"Error approving request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/approvals/{request_id}/reject")
+async def reject_request(request_id: str, data: Optional[Dict[str, Any]] = None):
+    """
+    Reject a pending request.
+    """
+    try:
+        notes = data.get("notes") if data else None
+        result = await integrated_supervisor.reject_request(request_id, notes)
+        return result
+    except Exception as e:
+        logger.error(f"Error rejecting request: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/approvals/{request_id}/voice")
+async def process_voice_approval(request_id: str, data: Dict[str, Any]):
+    """
+    Process voice-based approval response.
+    Expected data: {"user_response": "approve" | "reject"}
+    """
+    try:
+        user_response = data.get("user_response", "")
+        result = await integrated_supervisor.process_voice_approval(
+            request_id=request_id,
+            user_response=user_response
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error processing voice approval: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/approvals/{request_id}/voice-prompt")
+async def get_voice_approval_prompt(request_id: str):
+    """
+    Get voice prompt for an approval request.
+    """
+    try:
+        prompt = await integrated_supervisor.get_voice_approval_prompt(request_id)
+        return prompt
+    except Exception as e:
+        logger.error(f"Error getting voice prompt: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/agent-communication")
+async def get_agent_communication():
+    """
+    Get all agent-to-agent communication logs.
+    """
+    try:
+        communication = integrated_supervisor.get_agent_communication()
+        return {
+            "status": "success",
+            "communication": communication,
+            "count": len(communication)
+        }
+    except Exception as e:
+        logger.error(f"Error getting agent communication: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== Health Check ====================
 

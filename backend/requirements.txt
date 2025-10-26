@@ -124,3 +124,11 @@ yarl==1.22.0
 zipp==3.23.0
 pymongo==4.15.3
 certifi
+
+# LangChain and LangGraph for advanced multi-agent systems
+langchain==0.3.20
+langchain-core==0.3.39
+langchain-openai==0.3.5
+langchain-community==0.3.19
+langgraph==0.3.6
+langgraph-checkpoint==2.0.11
