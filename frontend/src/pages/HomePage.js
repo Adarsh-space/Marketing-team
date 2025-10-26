@@ -46,8 +46,8 @@ const HomePage = () => {
   } = useVoice(handleTranscript, selectedLanguage);
 
   useEffect(() => {
-    // Check HubSpot connection status
-    checkHubSpotStatus();
+    // Check Zoho connection status
+    checkZohoStatus();
     
     // Load supported languages
     loadLanguages();
