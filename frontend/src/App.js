@@ -10,6 +10,12 @@ import SettingsPage from "@/pages/SettingsPage";
 import AgentChatPage from "@/pages/AgentChatPage";
 import ImageTestPage from "@/pages/ImageTestPage";
 import TaskManagementPage from "@/pages/TaskManagementPage";
+import ZohoConnectionsPage from "@/pages/ZohoConnectionsPage";
+import SocialMediaCredentialsPage from "@/pages/SocialMediaCredentialsPage";
+import CampaignDashboard from "@/pages/CampaignDashboard";
+import EmailDashboard from "@/pages/EmailDashboard";
+import SocialMediaDashboard from "@/pages/SocialMediaDashboard";
+import AnalyticsDashboard from "@/pages/AnalyticsDashboard";
 import "@/App.css";
 
 function App() {
@@ -27,6 +33,12 @@ function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/test-image" element={<ImageTestPage />} />
           <Route path="/task-management" element={<TaskManagementPage />} />
+          <Route path="/zoho-connections" element={<ZohoConnectionsPage />} />
+          <Route path="/social-media-credentials" element={<SocialMediaCredentialsPage />} />
+          <Route path="/campaigns" element={<CampaignDashboard />} />
+          <Route path="/email" element={<EmailDashboard />} />
+          <Route path="/social-media" element={<SocialMediaDashboard />} />
+          <Route path="/analytics" element={<AnalyticsDashboard />} />
         </Routes>
       </BrowserRouter>
       <Toaster position="top-right" richColors />
