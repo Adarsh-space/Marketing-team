@@ -20,7 +20,7 @@ const HomePage = () => {
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [hubspotConnected, setHubspotConnected] = useState(false);
+  const [zohoConnected, setZohoConnected] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('en-US');
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(true);
