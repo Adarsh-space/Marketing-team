@@ -80,10 +80,10 @@ const HomePage = () => {
     }
   };
 
-  const checkHubSpotStatus = async () => {
+  const checkZohoStatus = async () => {
     try {
-      const response = await axios.get(`${API}/hubspot/status`);
-      setHubspotConnected(response.data.connected);
+      const response = await axios.get(`${API}/zoho/status`);
+      setZohoConnected(response.data.connected);
     } catch (error) {
       console.error('Error checking HubSpot status:', error);
     }
