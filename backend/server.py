@@ -22,6 +22,16 @@ from social_media_service import SocialMediaService
 from vector_memory_service import VectorMemoryService
 from agent_collaboration_system import AgentCollaborationSystem
 
+# Import Zoho services
+from zoho_auth_service import ZohoAuthService
+from zoho_crm_service import ZohoCRMService
+from zoho_mail_service import ZohoMailService
+from zoho_campaigns_service import ZohoCampaignsService
+from zoho_analytics_service import ZohoAnalyticsService
+
+# Import social media integration service
+from social_media_integration_service import SocialMediaIntegrationService
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -61,10 +71,11 @@ async def initialize_database():
             "tenants",
             "agent_events",
             "agent_tasks",
-            "hubspot_tokens",
+            "zoho_tokens",  # Zoho OAuth tokens
+            "social_credentials",  # Social media credentials
             "settings",
             "published_content",
-            "approval_requests"  # New collection for approval workflow
+            "approval_requests"  # Approval workflow
         ]
         
         # Create missing collections
@@ -101,6 +112,20 @@ voice_service = VoiceService()
 social_media_service = SocialMediaService()
 vector_memory = VectorMemoryService(db)
 collaboration_system = AgentCollaborationSystem(db)
+
+# Initialize Zoho services
+zoho_auth = ZohoAuthService(db)
+zoho_crm = ZohoCRMService(zoho_auth)
+zoho_mail = ZohoMailService(zoho_auth)
+zoho_campaigns = ZohoCampaignsService(zoho_auth)
+zoho_analytics = ZohoAnalyticsService(zoho_auth)
+
+# Initialize social media integration service
+social_media_integration = SocialMediaIntegrationService(zoho_crm, db)
+
+# Update SocialMediaAgent with social media service
+from agents.social_media_agent import SocialMediaAgent
+social_media_agent = SocialMediaAgent(social_media_integration)
 
 # Create the main app
 app = FastAPI(
@@ -152,14 +177,6 @@ class Campaign(BaseModel):
     created_at: str
     plan: Optional[Dict[str, Any]] = None
     results: Optional[Dict[str, Any]] = None
-
-class HubSpotConnection(BaseModel):
-    user_id: str
-    access_token: str
-    refresh_token: str
-    expires_at: int
-    portal_id: str
-    created_at: str
 
 # ==================== Chat Endpoints ====================
 
@@ -450,124 +467,6 @@ async def list_campaigns(limit: int = Query(default=50, le=100)):
         
     except Exception as e:
         logger.error(f"Error listing campaigns: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==================== HubSpot OAuth Endpoints ====================
-
-@api_router.get("/oauth/hubspot/authorize")
-async def hubspot_authorize():
-    """
-    Redirect user to HubSpot OAuth authorization page.
-    """
-    client_id = os.environ.get('HUBSPOT_CLIENT_ID')
-    redirect_uri = os.environ.get('HUBSPOT_REDIRECT_URI')
-    
-    # HubSpot OAuth URL
-    scopes = [
-        "crm.objects.contacts.read",
-        "crm.objects.contacts.write",
-        "crm.objects.companies.read",
-        "crm.objects.companies.write",
-        "crm.objects.deals.read",
-        "crm.objects.deals.write"
-    ]
-    
-    auth_url = (
-        f"https://app.hubspot.com/oauth/authorize"
-        f"?client_id={client_id}"
-        f"&redirect_uri={redirect_uri}"
-        f"&scope={' '.join(scopes)}"
-    )
-    
-    return {"authorization_url": auth_url}
-
-@api_router.get("/oauth/hubspot/callback")
-async def hubspot_callback(code: str):
-    """
-    Handle HubSpot OAuth callback and exchange code for tokens.
-    """
-    try:
-        client_id = os.environ.get('HUBSPOT_CLIENT_ID')
-        client_secret = os.environ.get('HUBSPOT_CLIENT_SECRET')
-        redirect_uri = os.environ.get('HUBSPOT_REDIRECT_URI')
-        
-        # Exchange code for access token
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.hubapi.com/oauth/v1/token",
-                data={
-                    "grant_type": "authorization_code",
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "redirect_uri": redirect_uri,
-                    "code": code
-                }
-            )
-            
-            if response.status_code != 200:
-                raise HTTPException(
-                    status_code=response.status_code,
-                    detail=f"HubSpot OAuth error: {response.text}"
-                )
-            
-            tokens = response.json()
-            
-            # Get user info
-            access_token = tokens["access_token"]
-            user_response = await client.get(
-                "https://api.hubapi.com/oauth/v1/access-tokens/" + access_token
-            )
-            user_info = user_response.json()
-            
-            # Store connection in database
-            connection = {
-                "user_id": user_info.get("user_id", "default_user"),
-                "portal_id": user_info.get("hub_id"),
-                "access_token": access_token,
-                "refresh_token": tokens["refresh_token"],
-                "expires_at": tokens["expires_in"],
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "token_type": tokens["token_type"]
-            }
-            
-            await db.hubspot_connections.update_one(
-                {"user_id": connection["user_id"]},
-                {"$set": connection},
-                upsert=True
-            )
-            
-            # Redirect to frontend success page
-            frontend_url = os.environ.get('REACT_APP_BACKEND_URL', '').replace('/api', '')
-            return RedirectResponse(url=f"{frontend_url}/?hubspot_connected=true")
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"HubSpot OAuth error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@api_router.get("/hubspot/status")
-async def hubspot_status(user_id: str = "default_user"):
-    """
-    Check HubSpot connection status.
-    """
-    try:
-        connection = await db.hubspot_connections.find_one(
-            {"user_id": user_id},
-            {"_id": 0, "access_token": 0, "refresh_token": 0}
-        )
-        
-        if not connection:
-            return {"connected": False}
-        
-        return {
-            "connected": True,
-            "portal_id": connection.get("portal_id"),
-            "connected_at": connection.get("created_at")
-        }
-        
-    except Exception as e:
-        logger.error(f"Error checking HubSpot status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== Analytics Endpoints ====================
@@ -1271,6 +1170,503 @@ async def get_agent_communication():
         logger.error(f"Error getting agent communication: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Zoho Integration Endpoints ====================
+
+@api_router.get("/zoho/connect")
+async def zoho_connect(user_id: str = "default_user"):
+    """Initiate Zoho OAuth connection."""
+    try:
+        state = str(uuid.uuid4())
+        auth_url = zoho_auth.get_authorization_url(state=state)
+        return {
+            "status": "success",
+            "authorization_url": auth_url,
+            "state": state
+        }
+    except Exception as e:
+        logger.error(f"Error initiating Zoho OAuth: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/zoho/callback")
+async def zoho_callback(code: str, state: str):
+    """Handle Zoho OAuth callback."""
+    try:
+        result = await zoho_auth.exchange_code_for_tokens(
+            authorization_code=code,
+            user_id="default_user"
+        )
+
+        if result.get("status") == "success":
+            return RedirectResponse(
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=connected"
+            )
+        else:
+            return RedirectResponse(
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=error"
+            )
+    except Exception as e:
+        logger.error(f"Zoho OAuth callback error: {str(e)}")
+        return RedirectResponse(
+            url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=error"
+        )
+
+@api_router.get("/zoho/status")
+async def zoho_status(user_id: str = "default_user"):
+    """Check Zoho connection status."""
+    try:
+        status = await zoho_auth.get_connection_status(user_id)
+        return status
+    except Exception as e:
+        logger.error(f"Error checking Zoho status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/zoho/disconnect")
+async def zoho_disconnect(user_id: str = "default_user"):
+    """Disconnect Zoho integration."""
+    try:
+        result = await zoho_auth.revoke_token(user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error disconnecting Zoho: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Zoho CRM Endpoints ====================
+
+@api_router.post("/zoho/campaigns/create")
+async def create_zoho_campaign(data: Dict[str, Any], user_id: str = "default_user"):
+    """Create campaign in Zoho CRM."""
+    try:
+        result = await zoho_crm.create_campaign(data, user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error creating campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/zoho/campaigns")
+async def list_zoho_campaigns(user_id: str = "default_user", page: int = 1, per_page: int = 20):
+    """List all campaigns from Zoho CRM."""
+    try:
+        result = await zoho_crm.list_campaigns(user_id, page, per_page)
+        return result
+    except Exception as e:
+        logger.error(f"Error listing campaigns: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/zoho/campaigns/{campaign_id}")
+async def get_zoho_campaign(campaign_id: str, user_id: str = "default_user"):
+    """Get campaign details from Zoho CRM."""
+    try:
+        result = await zoho_crm.get_campaign(campaign_id, user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.put("/zoho/campaigns/{campaign_id}")
+async def update_zoho_campaign(campaign_id: str, updates: Dict[str, Any], user_id: str = "default_user"):
+    """Update campaign in Zoho CRM."""
+    try:
+        result = await zoho_crm.update_campaign(campaign_id, updates, user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error updating campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Zoho Mail Endpoints ====================
+
+@api_router.post("/zoho/mail/send")
+async def send_zoho_mail(data: Dict[str, Any], user_id: str = "default_user"):
+    """
+    Send email via Zoho Mail.
+
+    Expected data:
+    {
+        "to": ["email@example.com"],
+        "subject": "Email subject",
+        "body": "<html>Email body</html>",
+        "cc": ["cc@example.com"],  # optional
+        "bcc": ["bcc@example.com"],  # optional
+        "schedule_time": "2025-01-27T10:00:00Z"  # optional
+    }
+    """
+    try:
+        result = await zoho_mail.send_email(
+            user_id=user_id,
+            to=data.get("to"),
+            subject=data.get("subject"),
+            body=data.get("body"),
+            cc=data.get("cc"),
+            bcc=data.get("bcc"),
+            schedule_time=data.get("schedule_time")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error sending email: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/zoho/mail/send-bulk")
+async def send_bulk_zoho_mail(data: Dict[str, Any], user_id: str = "default_user"):
+    """
+    Send bulk personalized emails.
+
+    Expected data:
+    {
+        "recipients": [
+            {"email": "john@example.com", "name": "John", "company": "Acme"},
+            {"email": "jane@example.com", "name": "Jane", "company": "TechCorp"}
+        ],
+        "subject_template": "Hello {name}!",
+        "body_template": "<p>Hi {name}, Special offer for {company}!</p>"
+    }
+    """
+    try:
+        result = await zoho_mail.send_bulk_email(
+            user_id=user_id,
+            recipients=data.get("recipients"),
+            subject_template=data.get("subject_template"),
+            body_template=data.get("body_template")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error sending bulk email: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/zoho/mail/messages")
+async def get_zoho_messages(folder_id: str = "1", page: int = 1, limit: int = 20, user_id: str = "default_user"):
+    """Get messages from Zoho Mail folder."""
+    try:
+        result = await zoho_mail.get_messages(folder_id, page, limit, user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting messages: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Zoho Campaigns Endpoints ====================
+
+@api_router.post("/zoho/campaigns/mailing-lists")
+async def create_mailing_list(data: Dict[str, Any], user_id: str = "default_user"):
+    """Create mailing list in Zoho Campaigns."""
+    try:
+        result = await zoho_campaigns.create_mailing_list(
+            list_name=data.get("list_name"),
+            list_description=data.get("description", ""),
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error creating mailing list: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/zoho/campaigns/email-campaign")
+async def create_email_campaign(data: Dict[str, Any], user_id: str = "default_user"):
+    """Create email campaign in Zoho Campaigns."""
+    try:
+        result = await zoho_campaigns.create_campaign(
+            campaign_name=data.get("campaign_name"),
+            list_key=data.get("list_key"),
+            subject=data.get("subject"),
+            from_email=data.get("from_email"),
+            html_content=data.get("html_content"),
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error creating email campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/zoho/campaigns/send")
+async def send_campaign(data: Dict[str, Any], user_id: str = "default_user"):
+    """Send or schedule email campaign."""
+    try:
+        result = await zoho_campaigns.send_campaign(
+            campaign_key=data.get("campaign_key"),
+            schedule_time=data.get("schedule_time"),
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error sending campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/zoho/campaigns/{campaign_key}/stats")
+async def get_campaign_stats(campaign_key: str, user_id: str = "default_user"):
+    """Get campaign statistics."""
+    try:
+        result = await zoho_campaigns.get_campaign_statistics(campaign_key, user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting campaign stats: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Zoho Analytics Endpoints ====================
+
+@api_router.post("/zoho/analytics/workspace")
+async def create_analytics_workspace(data: Dict[str, Any], user_id: str = "default_user"):
+    """Create workspace in Zoho Analytics."""
+    try:
+        result = await zoho_analytics.create_workspace(
+            workspace_name=data.get("workspace_name"),
+            description=data.get("description", ""),
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error creating workspace: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/zoho/analytics/import-data")
+async def import_analytics_data(data: Dict[str, Any], user_id: str = "default_user"):
+    """Import data to Zoho Analytics."""
+    try:
+        result = await zoho_analytics.import_data(
+            workspace_id=data.get("workspace_id"),
+            table_name=data.get("table_name"),
+            data=data.get("data"),
+            import_type=data.get("import_type", "append"),
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error importing data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/zoho/analytics/create-chart")
+async def create_analytics_chart(data: Dict[str, Any], user_id: str = "default_user"):
+    """Create chart in Zoho Analytics."""
+    try:
+        result = await zoho_analytics.create_chart(
+            workspace_id=data.get("workspace_id"),
+            view_name=data.get("view_name"),
+            chart_config=data.get("chart_config"),
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error creating chart: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/zoho/analytics/chart/{view_id}/data")
+async def get_chart_data(workspace_id: str, view_id: str, user_id: str = "default_user"):
+    """Get chart data from Zoho Analytics."""
+    try:
+        result = await zoho_analytics.get_chart_data(workspace_id, view_id, user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting chart data: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Social Media Integration Endpoints ====================
+
+@api_router.get("/social-media/facebook/connect")
+async def facebook_connect(user_id: str = "default_user"):
+    """Initiate Facebook OAuth connection."""
+    try:
+        state = str(uuid.uuid4())
+        auth_url = await social_media_integration.get_facebook_oauth_url(
+            client_id=os.environ.get('FACEBOOK_APP_ID'),
+            redirect_uri=os.environ.get('FACEBOOK_REDIRECT_URI'),
+            state=state
+        )
+        return {
+            "status": "success",
+            "authorization_url": auth_url,
+            "state": state
+        }
+    except Exception as e:
+        logger.error(f"Error initiating Facebook OAuth: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social-media/facebook/callback")
+async def facebook_callback(code: str, state: str):
+    """Handle Facebook OAuth callback."""
+    try:
+        token_result = await social_media_integration.exchange_facebook_code(
+            code=code,
+            client_id=os.environ.get('FACEBOOK_APP_ID'),
+            client_secret=os.environ.get('FACEBOOK_APP_SECRET'),
+            redirect_uri=os.environ.get('FACEBOOK_REDIRECT_URI')
+        )
+
+        if token_result.get("status") == "success":
+            # Save credentials
+            await social_media_integration.save_credentials(
+                user_id="default_user",
+                platform="facebook",
+                credentials={"access_token": token_result.get("access_token")},
+                auth_type="oauth"
+            )
+
+            return RedirectResponse(
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?facebook=connected"
+            )
+        else:
+            return RedirectResponse(
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?facebook=error"
+            )
+    except Exception as e:
+        logger.error(f"Facebook OAuth callback error: {str(e)}")
+        return RedirectResponse(
+            url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?facebook=error"
+        )
+
+@api_router.post("/social-media/credentials")
+async def save_social_credentials(data: Dict[str, Any]):
+    """
+    Save social media credentials.
+
+    Expected data:
+    {
+        "user_id": "user123",
+        "platform": "facebook|instagram",
+        "credentials": {"access_token": "..."} or {"username": "...", "password": "..."},
+        "auth_type": "oauth|password"
+    }
+    """
+    try:
+        result = await social_media_integration.save_credentials(
+            user_id=data.get("user_id", "default_user"),
+            platform=data.get("platform"),
+            credentials=data.get("credentials"),
+            auth_type=data.get("auth_type", "oauth")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error saving credentials: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social-media/facebook/pages")
+async def get_facebook_pages(user_id: str = "default_user"):
+    """Get user's Facebook pages."""
+    try:
+        result = await social_media_integration.get_user_pages(user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting Facebook pages: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social-media/instagram/accounts")
+async def get_instagram_accounts(user_id: str = "default_user"):
+    """Get user's Instagram Business accounts."""
+    try:
+        result = await social_media_integration.get_instagram_accounts(user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting Instagram accounts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/social-media/credentials/{platform}")
+async def delete_social_credentials(platform: str, user_id: str = "default_user"):
+    """Disconnect social media account."""
+    try:
+        result = await social_media_integration.delete_credentials(user_id, platform)
+        return result
+    except Exception as e:
+        logger.error(f"Error deleting credentials: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/social-media/facebook/post")
+async def post_to_facebook(data: Dict[str, Any]):
+    """
+    Post to Facebook page.
+
+    Expected data:
+    {
+        "user_id": "user123",
+        "message": "Post content",
+        "image_url": "https://...",  # optional
+        "link": "https://...",  # optional
+        "page_id": "page123"  # optional
+    }
+    """
+    try:
+        result = await social_media_integration.post_to_facebook(
+            user_id=data.get("user_id", "default_user"),
+            message=data.get("message"),
+            page_id=data.get("page_id"),
+            image_url=data.get("image_url"),
+            link=data.get("link")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error posting to Facebook: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/social-media/instagram/post")
+async def post_to_instagram(data: Dict[str, Any]):
+    """
+    Post to Instagram Business account.
+
+    Expected data:
+    {
+        "user_id": "user123",
+        "image_url": "https://...",  # required
+        "caption": "Post caption",
+        "instagram_account_id": "insta123"  # required
+    }
+    """
+    try:
+        result = await social_media_integration.post_to_instagram(
+            user_id=data.get("user_id", "default_user"),
+            image_url=data.get("image_url"),
+            caption=data.get("caption"),
+            instagram_account_id=data.get("instagram_account_id")
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error posting to Instagram: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/social-media/ai-post")
+async def ai_generate_and_post(data: Dict[str, Any]):
+    """
+    Generate content with AI and post to social media.
+
+    Expected data:
+    {
+        "user_id": "user123",
+        "prompt": "Create Instagram post about our new product",
+        "platform": "facebook|instagram",
+        "auto_post": true,
+        "page_id": "page123",  # for Facebook
+        "instagram_account_id": "insta123"  # for Instagram
+    }
+    """
+    try:
+        # Generate content using SocialMediaAgent
+        content_result = await social_media_agent.execute({
+            "task_id": str(uuid.uuid4()),
+            "user_message": data.get("prompt"),
+            "campaign_brief": {"product": "AI-generated post", "target_audience": "General"}
+        })
+
+        # Extract posting content
+        if data.get("auto_post"):
+            post_result = await social_media_agent.post_to_platform(
+                user_id=data.get("user_id", "default_user"),
+                platform=data.get("platform"),
+                content={
+                    "message": content_result.get("content", {}).get("caption", ""),
+                    "image_url": data.get("image_url"),
+                    "hashtags": content_result.get("hashtag_strategy", {}).get("brand_hashtags", [])
+                }
+            )
+
+            return {
+                "status": "success",
+                "generated_content": content_result,
+                "post_result": post_result
+            }
+        else:
+            return {
+                "status": "success",
+                "generated_content": content_result,
+                "message": "Content generated. Use /post endpoint to publish."
+            }
+
+    except Exception as e:
+        logger.error(f"Error in AI post: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Health Check ====================
 
 @api_router.get("/health")
@@ -1301,60 +1697,6 @@ async def root():
 
 # Include router
 app.include_router(api_router)
-
-# HubSpot OAuth callback (root level to match redirect URI)
-@app.get("/callback")
-async def hubspot_oauth_callback(code: str = None, error: str = None):
-    """Handle HubSpot OAuth callback at root level."""
-    try:
-        if error:
-            logger.error(f"OAuth error: {error}")
-            return RedirectResponse(url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/?error={error}")
-        
-        if not code:
-            raise HTTPException(status_code=400, detail="No authorization code provided")
-        
-        # Exchange code for access token
-        token_url = "https://api.hubapi.com/oauth/v1/token"
-        data = {
-            "grant_type": "authorization_code",
-            "client_id": os.environ.get('HUBSPOT_CLIENT_ID'),
-            "client_secret": os.environ.get('HUBSPOT_CLIENT_SECRET'),
-            "redirect_uri": os.environ.get('HUBSPOT_REDIRECT_URI'),
-            "code": code
-        }
-        
-        response = requests.post(token_url, data=data)
-        
-        if response.status_code == 200:
-            token_data = response.json()
-            
-            # Store tokens in database
-            await db.hubspot_tokens.update_one(
-                {"user_id": "default_user"},
-                {
-                    "$set": {
-                        "access_token": token_data.get("access_token"),
-                        "refresh_token": token_data.get("refresh_token"),
-                        "expires_in": token_data.get("expires_in"),
-                        "created_at": datetime.now(timezone.utc).isoformat()
-                    }
-                },
-                upsert=True
-            )
-            
-            logger.info("HubSpot OAuth successful")
-            
-            # Redirect to frontend success page
-            return RedirectResponse(url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?hubspot=connected")
-        else:
-            error_msg = response.json().get("message", "Unknown error")
-            logger.error(f"Token exchange failed: {error_msg}")
-            raise HTTPException(status_code=400, detail=error_msg)
-            
-    except Exception as e:
-        logger.error(f"OAuth callback error: {str(e)}")
-        return RedirectResponse(url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/?error=oauth_failed")
 
 # CORS middleware
 app.add_middleware(
