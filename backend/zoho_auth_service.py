@@ -13,7 +13,7 @@ import httpx
 import os
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone, timedelta
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -23,12 +23,6 @@ class ZohoAuthService:
     Complete Zoho OAuth 2.0 authentication service.
     Supports all Zoho services: CRM, Mail, Campaigns, Creator, Analytics.
     """
-
-    # Zoho OAuth endpoints (India region)
-    OAUTH_BASE_URL = "https://accounts.zoho.in/oauth/v2"
-    AUTH_URL = f"{OAUTH_BASE_URL}/auth"
-    TOKEN_URL = f"{OAUTH_BASE_URL}/token"
-    REVOKE_URL = f"{OAUTH_BASE_URL}/token/revoke"
 
     # Default scopes for all services
     DEFAULT_SCOPES = [
@@ -45,7 +39,14 @@ class ZohoAuthService:
         "ZohoAnalytics.workspace.ALL"
     ]
 
-    def __init__(self, db, client_id: str = None, client_secret: str = None, redirect_uri: str = None):
+    def __init__(
+        self,
+        db,
+        client_id: str = None,
+        client_secret: str = None,
+        redirect_uri: str = None,
+        data_center: str = None
+    ):
         """
         Initialize Zoho Auth Service.
 
@@ -54,11 +55,20 @@ class ZohoAuthService:
             client_id: Zoho OAuth Client ID (from API Console)
             client_secret: Zoho OAuth Client Secret
             redirect_uri: OAuth redirect URI
+            data_center: Optional Zoho data center suffix (e.g., "com", "in")
         """
         self.db = db
         self.client_id = client_id or os.environ.get('ZOHO_CLIENT_ID')
         self.client_secret = client_secret or os.environ.get('ZOHO_CLIENT_SECRET')
         self.redirect_uri = redirect_uri or os.environ.get('ZOHO_REDIRECT_URI')
+        self.data_center = self._normalize_data_center(
+            data_center or os.environ.get('ZOHO_DATA_CENTER')
+        )
+        self.accounts_domain = f"accounts.zoho.{self.data_center}"
+        self.oauth_base_url = f"https://{self.accounts_domain}/oauth/v2"
+        self.auth_url = f"{self.oauth_base_url}/auth"
+        self.token_url = f"{self.oauth_base_url}/token"
+        self.revoke_url = f"{self.oauth_base_url}/token/revoke"
 
         if not all([self.client_id, self.client_secret, self.redirect_uri]):
             logger.warning(
@@ -67,6 +77,39 @@ class ZohoAuthService:
             )
 
         logger.info("Zoho Auth Service initialized")
+        logger.info("Zoho data center resolved to %s", self.accounts_domain)
+
+    @staticmethod
+    def _normalize_data_center(value: Optional[str]) -> str:
+        """
+        Normalize Zoho data center input into a suffix (e.g., 'com', 'in').
+
+        Supports direct suffixes, values with leading dots, hostnames, or URLs.
+        Defaults to 'com' when no valid value is provided.
+        """
+        if not value:
+            return "com"
+
+        value = value.strip().lower()
+        if not value:
+            return "com"
+
+        if value.startswith("http"):
+            parsed = urlparse(value)
+            host = parsed.hostname or ""
+        else:
+            host = value
+
+        host = host.strip()
+        host = host.lstrip(".")
+
+        if host.startswith("accounts.zoho."):
+            host = host.split("accounts.zoho.", 1)[1]
+        elif host.startswith("zoho."):
+            host = host.split("zoho.", 1)[1]
+
+        host = host.strip(".")
+        return host or "com"
 
     def get_authorization_url(
         self,
@@ -95,7 +138,7 @@ class ZohoAuthService:
             "prompt": "consent"
         }
 
-        auth_url = f"{self.AUTH_URL}?{urlencode(params)}"
+        auth_url = f"{self.auth_url}?{urlencode(params)}"
         logger.info(f"Generated authorization URL with state: {state}")
         return auth_url
 
@@ -124,7 +167,7 @@ class ZohoAuthService:
                     "code": authorization_code
                 }
 
-                response = await client.post(self.TOKEN_URL, data=data)
+                response = await client.post(self.token_url, data=data)
 
                 if response.status_code != 200:
                     error_data = response.json()
@@ -191,7 +234,7 @@ class ZohoAuthService:
                     "refresh_token": refresh_token
                 }
 
-                response = await client.post(self.TOKEN_URL, data=data)
+                response = await client.post(self.token_url, data=data)
 
                 if response.status_code != 200:
                     error_data = response.json()
@@ -317,7 +360,7 @@ class ZohoAuthService:
 
             async with httpx.AsyncClient() as client:
                 params = {"token": access_token}
-                response = await client.post(self.REVOKE_URL, params=params)
+                response = await client.post(self.revoke_url, params=params)
 
                 if response.status_code == 200:
                     # Remove tokens from database
