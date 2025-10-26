@@ -24,8 +24,8 @@ class ZohoAuthService:
     Supports all Zoho services: CRM, Mail, Campaigns, Creator, Analytics.
     """
 
-    # Zoho OAuth endpoints (adjust for your data center)
-    OAUTH_BASE_URL = "https://accounts.zoho.com/oauth/v2"
+    # Zoho OAuth endpoints (India region)
+    OAUTH_BASE_URL = "https://accounts.zoho.in/oauth/v2"
     AUTH_URL = f"{OAUTH_BASE_URL}/auth"
     TOKEN_URL = f"{OAUTH_BASE_URL}/token"
     REVOKE_URL = f"{OAUTH_BASE_URL}/token/revoke"
