@@ -24,19 +24,10 @@ class ZohoAuthService:
     Supports all Zoho services: CRM, Mail, Campaigns, Creator, Analytics.
     """
 
-    # Default scopes for all services
+    # Default scopes - start with basic CRM access
     DEFAULT_SCOPES = [
         "ZohoCRM.modules.ALL",
-        "ZohoCRM.settings.ALL",
-        "ZohoCRM.users.ALL",
-        "ZohoMail.messages.ALL",
-        "ZohoMail.accounts.ALL",
-        "ZohoCampaigns.campaign.ALL",
-        "ZohoCampaigns.contact.ALL",
-        "ZohoCreator.meta.ALL",
-        "ZohoCreator.report.ALL",
-        "ZohoAnalytics.data.ALL",
-        "ZohoAnalytics.workspace.ALL"
+        "ZohoCRM.users.READ"
     ]
 
     def __init__(
