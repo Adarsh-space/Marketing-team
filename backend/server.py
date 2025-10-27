@@ -1198,16 +1198,16 @@ async def zoho_callback(code: str, state: str):
 
         if result.get("status") == "success":
             return RedirectResponse(
-                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=connected"
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=connected"
             )
         else:
             return RedirectResponse(
-                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=error"
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
             )
     except Exception as e:
         logger.error(f"Zoho OAuth callback error: {str(e)}")
         return RedirectResponse(
-            url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=error"
+            url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
         )
 
 @api_router.get("/zoho/status")
