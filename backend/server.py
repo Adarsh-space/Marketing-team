@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, BackgroundTasks, Query, UploadFile, File, Form
-from fastapi.responses import RedirectResponse, StreamingResponse
+from fastapi.responses import RedirectResponse, StreamingResponse, HTMLResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -1188,26 +1188,130 @@ async def zoho_connect(user_id: str = "default_user"):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/zoho/callback")
-async def zoho_callback(code: str, state: str):
+async def zoho_callback(code: str = None, state: str = None, error: str = None):
     """Handle Zoho OAuth callback."""
+    # Get frontend URL from environment with better default handling
+    frontend_url = os.environ.get('REACT_APP_FRONTEND_URL')
+    if not frontend_url:
+        # Try to infer from request if available, otherwise use localhost
+        frontend_url = 'http://localhost:3000'
+        logger.warning(f"REACT_APP_FRONTEND_URL not set, using default: {frontend_url}")
+
     try:
+        # Check if Zoho returned an error
+        if error:
+            logger.error(f"Zoho OAuth error: {error}")
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Zoho Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">❌ Zoho Connection Failed</h2>
+                        <p>Error: {error}</p>
+                        <p>Redirecting to settings...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?zoho=error&error={error}";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
+            )
+
+        # Check if code parameter is missing
+        if not code:
+            logger.error("Zoho OAuth callback missing 'code' parameter")
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Zoho Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">❌ Zoho Connection Failed</h2>
+                        <p>Error: Missing authorization code</p>
+                        <p>Redirecting to settings...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?zoho=error&error=missing_code";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=400
+            )
+
+        logger.info(f"Zoho OAuth callback received, exchanging code for tokens...")
+
+        # Exchange code for tokens
         result = await zoho_auth.exchange_code_for_tokens(
             authorization_code=code,
             user_id="default_user"
         )
 
         if result.get("status") == "success":
-            return RedirectResponse(
-                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=connected"
+            logger.info("✅ Zoho OAuth successful, tokens stored")
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Zoho Connected Successfully</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #28a745;">✅ Zoho Connected Successfully!</h2>
+                        <p>Your Zoho account has been connected.</p>
+                        <p>Redirecting to settings...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?zoho=connected";
+                            }}, 1500);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
             )
         else:
-            return RedirectResponse(
-                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=error"
+            error_message = result.get("message", "Unknown error")
+            error_type = result.get("error", "token_exchange_failed")
+            logger.error(f"Zoho token exchange failed: {error_message}")
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Zoho Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">❌ Zoho Connection Failed</h2>
+                        <p>Error: {error_message}</p>
+                        <p>Redirecting to settings...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?zoho=error&error={error_type}";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
             )
+
     except Exception as e:
-        logger.error(f"Zoho OAuth callback error: {str(e)}")
-        return RedirectResponse(
-            url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/settings?zoho=error"
+        logger.error(f"Zoho OAuth callback error: {str(e)}", exc_info=True)
+        return HTMLResponse(
+            content=f"""
+            <html>
+                <head><title>Zoho Connection Error</title></head>
+                <body style="font-family: Arial; padding: 50px; text-align: center;">
+                    <h2 style="color: #dc3545;">❌ Zoho Connection Error</h2>
+                    <p>An unexpected error occurred: {str(e)}</p>
+                    <p>Redirecting to settings...</p>
+                    <script>
+                        setTimeout(function() {{
+                            window.location.href = "{frontend_url}/settings?zoho=error&error=unexpected";
+                        }}, 2000);
+                    </script>
+                </body>
+            </html>
+            """,
+            status_code=500
         )
 
 @api_router.get("/zoho/status")
