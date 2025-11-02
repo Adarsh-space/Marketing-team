@@ -160,7 +160,13 @@ const VoiceAssistantWithAgents = () => {
             });
           }
 
-          addAgentLog('System', 'WAITING', '⏸️  Awaiting your approval. Say "approve" to proceed.');
+          addAgentLog('System', 'WAITING', '⏸️  Awaiting your approval. Say "approve" to proceed, or visit Task Management page.');
+
+          // Navigate to task management page to review approval
+          setTimeout(() => {
+            toast.info('📋 Review your campaign in Task Management', { duration: 3000 });
+            navigate('/task-management');
+          }, 2000);
         }, 1500);
       } else if (responseType === 'campaign_executing') {
         // User approved - show real-time agent execution
@@ -186,8 +192,11 @@ const VoiceAssistantWithAgents = () => {
           addAgentLog('EmailAgent', 'COMPLETE', 'Campaign ready to send!');
           addAgentLog('System', 'SUCCESS', '🎉 Campaign execution complete!');
           toast.success('Campaign executed successfully!');
-          // Navigate to campaign page after execution completes
-          setTimeout(() => navigate(`/campaign/${chatResponse.data.campaign_id}`), 2000);
+          // Navigate to task management page after execution completes
+          setTimeout(() => {
+            toast.success('View campaign details in Task Management');
+            navigate('/task-management');
+          }, 2000);
         }, 7000);
       } else if (chatResponse.data.ready_to_plan) {
         // Legacy flow for backward compatibility

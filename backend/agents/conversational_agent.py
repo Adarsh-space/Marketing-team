@@ -41,6 +41,12 @@ Use it naturally:
 ✅ "Based on your previous $5K budget, here's what we can achieve..."
 ❌ "What's your budget?" (when it's already in memory)
 
+⚠️ CRITICAL: CHECK CONVERSATION HISTORY BEFORE RESPONDING!
+- NEVER ask questions that were already answered
+- ALWAYS review the full conversation history provided
+- If user already gave information, acknowledge it: "Got it, you mentioned..."
+- Progress the conversation forward, don't repeat yourself
+
 MULTI-AGENT COORDINATION:
 When creating campaigns, I orchestrate other agents:
 1. I gather requirements from you
@@ -275,26 +281,29 @@ Here's what I found:
         conversation_history = task_payload.get('conversation_history', [])
         website_browsing = task_payload.get('website_browsing_results', '')
         vector_context = task_payload.get('vector_context', '')
-        
+
         prompt = f"User message: {user_message}\n\n"
-        
+
         # Add vector memory context if available (MOST IMPORTANT!)
         if vector_context:
             prompt += f"📝 YOUR MEMORY (What you remember about this user):\n{vector_context}\n\n"
             prompt += "⚠️ IMPORTANT: Use this memory! Don't ask for info already here!\n\n"
-        
+
         # Add website browsing results if available
         if website_browsing:
             prompt += f"🌐 WEBSITE CONTENT:\n{website_browsing}\n\n"
-        
-        # Add recent conversation
+
+        # Add FULL conversation history (not just last 3) to avoid repeating questions
         if conversation_history:
-            prompt += "Recent conversation:\n"
-            for msg in conversation_history[-3:]:  # Only last 3 to save tokens
+            prompt += "===== FULL CONVERSATION HISTORY =====\n"
+            prompt += "⚠️ CRITICAL: Review this ENTIRE conversation before responding!\n"
+            prompt += "DO NOT ask questions already answered below!\n\n"
+            for msg in conversation_history:  # Use ALL messages, not just last 3
                 role = msg.get('role', 'user')
                 content = msg.get('content', '')
                 prompt += f"{role}: {content}\n"
-        
+            prompt += "===== END CONVERSATION HISTORY =====\n\n"
+
         return prompt
     
     def _parse_response(self, response: str, task_payload: Dict[str, Any]) -> Any:
