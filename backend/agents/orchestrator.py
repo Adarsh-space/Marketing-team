@@ -17,6 +17,8 @@ from .reporting_agent import ReportingAgent
 from .image_generation_agent import ImageGenerationAgent
 from .video_generation_agent import VideoGenerationAgent
 from .multi_model_video_agent import MultiModelVideoAgent
+from .scraping_agent import ScrapingAgent
+from .approval_workflow import ApprovalWorkflowManager, ApprovalType
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,12 @@ class AgentOrchestrator:
     """
     Central orchestrator that manages the lifecycle of marketing campaigns.
     Routes tasks to appropriate agents and manages their execution.
+    Now integrated with Zoho CRM for data storage!
     """
-    
-    def __init__(self, db):
+
+    def __init__(self, db, zoho_crm_service=None):
         self.db = db
+        self.zoho_crm_service = zoho_crm_service
         self.agents = {
             "ConversationalAgent": ConversationalAgent(),
             "PlanningAgent": PlanningAgent(),
@@ -41,9 +45,12 @@ class AgentOrchestrator:
             "ReportingAgent": ReportingAgent(),
             "ImageGenerationAgent": ImageGenerationAgent(),
             "VideoGenerationAgent": VideoGenerationAgent(),
-            "MultiModelVideoAgent": MultiModelVideoAgent()
+            "MultiModelVideoAgent": MultiModelVideoAgent(),
+            "ScrapingAgent": ScrapingAgent()
         }
-        logger.info("AgentOrchestrator initialized with all agents including MultiModelVideoAgent (Sora, Runway, Luma, Stability)")
+        # Initialize approval workflow manager
+        self.approval_manager = ApprovalWorkflowManager(db)
+        logger.info("AgentOrchestrator initialized with all agents including ScrapingAgent, ApprovalWorkflow, and Zoho CRM integration")
     
     async def process_user_message(
         self,
@@ -53,20 +60,83 @@ class AgentOrchestrator:
     ) -> Dict[str, Any]:
         """
         Process a user message through the Conversational Interface Agent.
-        Now with vector memory context!
+        Now with vector memory context and approval handling!
         """
         try:
             # Get conversation history
             conversation = await self.db.conversations.find_one({"conversation_id": conversation_id})
-            
+
             if not conversation:
                 # Create new conversation
                 conversation = {
                     "conversation_id": conversation_id,
                     "created_at": datetime.now(timezone.utc).isoformat(),
-                    "messages": []
+                    "messages": [],
+                    "pending_approval": None
                 }
                 await self.db.conversations.insert_one(conversation)
+
+            # Check if there's a pending approval for this conversation
+            pending_approval = conversation.get("pending_approval")
+
+            if pending_approval:
+                # User is responding to approval request
+                user_response_lower = user_message.lower().strip()
+
+                if any(word in user_response_lower for word in ["approve", "approved", "yes", "okay", "ok", "proceed", "go ahead", "confirm"]):
+                    # User approved!
+                    campaign_id = pending_approval["campaign_id"]
+                    approval_request_id = pending_approval["approval_request_id"]
+
+                    # Approve the campaign
+                    logger.info(f"User approved campaign {campaign_id} via chat")
+
+                    await self.approval_manager.approve_request(approval_request_id)
+
+                    # Execute the campaign
+                    result = await self.execute_campaign_with_approval(
+                        campaign_id=campaign_id,
+                        approval_request_id=approval_request_id
+                    )
+
+                    # Clear pending approval
+                    await self.db.conversations.update_one(
+                        {"conversation_id": conversation_id},
+                        {"$set": {"pending_approval": None}}
+                    )
+
+                    # Return execution result
+                    return {
+                        "type": "campaign_executing",
+                        "message": "Great! I'm executing your campaign now. Agents are working together...\n\nI'll let you know when it's complete!",
+                        "campaign_id": campaign_id,
+                        "ready_to_plan": True,
+                        "execution_started": True
+                    }
+
+                elif any(word in user_response_lower for word in ["reject", "rejected", "no", "cancel", "stop", "decline"]):
+                    # User rejected
+                    campaign_id = pending_approval["campaign_id"]
+                    approval_request_id = pending_approval["approval_request_id"]
+
+                    logger.info(f"User rejected campaign {campaign_id} via chat")
+
+                    await self.approval_manager.reject_request(
+                        approval_request_id,
+                        notes="User rejected via chat"
+                    )
+
+                    # Clear pending approval
+                    await self.db.conversations.update_one(
+                        {"conversation_id": conversation_id},
+                        {"$set": {"pending_approval": None}}
+                    )
+
+                    return {
+                        "type": "campaign_rejected",
+                        "message": "No problem! Campaign cancelled. What else can I help you with?",
+                        "ready_to_plan": False
+                    }
             
             # Add user message to history
             user_msg = {
@@ -128,12 +198,60 @@ class AgentOrchestrator:
             # Check if ready to create campaign
             if result.get("ready_to_plan"):
                 campaign_brief = result.get("campaign_brief", {})
-                campaign = await self.create_campaign(campaign_brief, conversation_id)
-                
+
+                # Use NEW approval workflow
+                campaign_result = await self.create_campaign_with_approval(
+                    campaign_brief=campaign_brief,
+                    conversation_id=conversation_id
+                )
+
+                # Format approval request for user
+                approval_request = campaign_result.get("approval_request", {})
+                plan = campaign_result.get("plan", {})
+
+                # Create user-friendly message
+                message = f"""Perfect! I've created an execution plan for your campaign.
+
+CAMPAIGN PLAN:
+{plan.get('summary', 'Multi-step marketing campaign')}
+
+AGENTS INVOLVED:
+"""
+                tasks = plan.get("tasks", [])
+                for task in tasks[:5]:  # Show first 5 tasks
+                    agent = task.get("agent_assigned", "Unknown")
+                    desc = task.get("description", "")
+                    message += f"- {agent}: {desc}\n"
+
+                if len(tasks) > 5:
+                    message += f"... and {len(tasks) - 5} more tasks\n"
+
+                message += f"""
+ESTIMATED COST: {approval_request.get('details', {}).get('estimated_cost', 'TBD')}
+TIMELINE: {approval_request.get('details', {}).get('estimated_duration', 'Based on task complexity')}
+
+Please review the plan and approve to start execution. Once approved, agents will work together to complete all tasks.
+
+Reply 'approve' to proceed or 'reject' to cancel.
+"""
+
+                # Store pending approval in conversation
+                await self.db.conversations.update_one(
+                    {"conversation_id": conversation_id},
+                    {"$set": {
+                        "pending_approval": {
+                            "campaign_id": campaign_result["campaign_id"],
+                            "approval_request_id": approval_request["request_id"]
+                        }
+                    }}
+                )
+
                 return {
-                    "type": "campaign_created",
-                    "message": "Great! I've created your campaign plan. Let me start working on it.",
-                    "campaign_id": campaign["campaign_id"],
+                    "type": "awaiting_approval",
+                    "message": message,
+                    "campaign_id": campaign_result["campaign_id"],
+                    "approval_request_id": approval_request["request_id"],
+                    "plan": plan,
                     "ready_to_plan": True
                 }
             else:
@@ -248,19 +366,34 @@ class AgentOrchestrator:
                     "task_id": task_id,
                     "campaign_brief": campaign["brief"],
                     "task_description": task.get("description", ""),
-                    "task_requirements": task.get("requirements", [])
+                    "task_requirements": task.get("requirements", []),
+                    # Zoho CRM integration
+                    "campaign_id": campaign.get("zoho_campaign_id", campaign_id),  # Use Zoho campaign ID if available
+                    "zoho_crm_service": self.zoho_crm_service,  # Zoho CRM service instance
+                    "user_id": campaign.get("user_id", campaign["brief"].get("user_id", "default_user"))  # For Zoho auth
                 }
-                
+
+                # Add scraping-specific parameters for ScrapingAgent
+                if agent_name == "ScrapingAgent":
+                    brief = campaign["brief"]
+                    task_payload.update({
+                        "scraping_source": "google_maps",  # or from brief
+                        "query": brief.get("target_audience", "businesses"),
+                        "location": brief.get("location", brief.get("target_location", "United States")),
+                        "max_results": brief.get("contact_count", 50)
+                    })
+
                 # Add previous task results but ensure they're clean
                 if task_results:
                     task_payload["previous_results"] = {
                         task_name: {
                             "status": result.get("status"),
-                            "agent": result.get("agent")
+                            "agent": result.get("agent"),
+                            "result": result.get("result", {})  # Include result data for agent collaboration
                         } for task_name, result in task_results.items()
                     }
-                
-                logger.info(f"Executing task: {task_id} with agent: {agent_name}")
+
+                logger.info(f"Executing task: {task_id} with agent: {agent_name} (Zoho CRM: {'enabled' if self.zoho_crm_service else 'disabled'})")
                 result = await agent.execute(task_payload)
                 
                 # Store task result
@@ -345,3 +478,172 @@ class AgentOrchestrator:
         """List all campaigns."""
         campaigns = await self.db.campaigns.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
         return campaigns
+
+    async def create_campaign_with_approval(
+        self,
+        campaign_brief: Dict[str, Any],
+        conversation_id: str = None
+    ) -> Dict[str, Any]:
+        """
+        Create campaign and request approval before execution.
+        This is the NEW workflow with approval.
+
+        Steps:
+        1. Create campaign
+        2. Generate plan with Planning Agent
+        3. Create approval request
+        4. Return plan and approval_request_id to frontend
+        5. Wait for user approval
+        6. Execute when approved
+        """
+        try:
+            # Step 1: Create campaign in MongoDB
+            campaign = await self.create_campaign(campaign_brief, conversation_id)
+            campaign_id = campaign["campaign_id"]
+
+            # Step 1.5: Create campaign in Zoho CRM (if available)
+            zoho_campaign_id = None
+            if self.zoho_crm_service:
+                try:
+                    logger.info(f"Creating campaign {campaign_id} in Zoho CRM...")
+                    zoho_result = await self.zoho_crm_service.create_campaign(
+                        campaign_data={
+                            "name": campaign_brief.get("product", "Campaign") + f" - {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
+                            "status": "Planning",
+                            "type": "Email",
+                            "budget": campaign_brief.get("budget", 0),
+                            "description": campaign_brief.get("objective", ""),
+                            "target_audience": campaign_brief.get("target_audience", ""),
+                            "product": campaign_brief.get("product", ""),
+                            "goal": campaign_brief.get("objective", "")
+                        },
+                        user_id=campaign_brief.get("user_id", "default_user")
+                    )
+                    if zoho_result.get("status") == "success":
+                        zoho_campaign_id = zoho_result["campaign_id"]
+                        logger.info(f"Created Zoho CRM campaign: {zoho_campaign_id}")
+                        # Store Zoho campaign ID in MongoDB campaign
+                        await self.db.campaigns.update_one(
+                            {"campaign_id": campaign_id},
+                            {"$set": {"zoho_campaign_id": zoho_campaign_id}}
+                        )
+                    else:
+                        logger.warning(f"Failed to create Zoho campaign: {zoho_result.get('message')}")
+                except Exception as e:
+                    logger.error(f"Error creating Zoho campaign: {str(e)}")
+                    # Continue without Zoho CRM
+
+            # Step 2: Generate plan
+            await self._update_campaign_status(campaign_id, "planning")
+            planning_agent = self.agents["PlanningAgent"]
+            plan_response = await planning_agent.execute({
+                "campaign_brief": campaign_brief,
+                "task_id": "planning"
+            })
+
+            plan = plan_response.get("result", {})
+            await self.db.campaigns.update_one(
+                {"campaign_id": campaign_id},
+                {"$set": {"plan": plan, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+
+            # Step 3: Create approval request
+            approval_request = await self.approval_manager.create_campaign_approval_request(
+                campaign_brief=campaign_brief,
+                plan=plan,
+                conversation_id=conversation_id
+            )
+
+            # Store approval request ID in campaign
+            await self.db.campaigns.update_one(
+                {"campaign_id": campaign_id},
+                {"$set": {
+                    "approval_request_id": approval_request.request_id,
+                    "status": "awaiting_approval"
+                }}
+            )
+
+            logger.info(f"Campaign {campaign_id} created and awaiting approval")
+
+            return {
+                "campaign_id": campaign_id,
+                "status": "awaiting_approval",
+                "plan": self._clean_for_json(plan),
+                "approval_request": approval_request.to_dict(),
+                "message": "Campaign plan created. Please review and approve to proceed."
+            }
+
+        except Exception as e:
+            logger.error(f"Error creating campaign with approval: {str(e)}")
+            raise
+
+    async def execute_campaign_with_approval(
+        self,
+        campaign_id: str,
+        approval_request_id: str
+    ) -> Dict[str, Any]:
+        """
+        Execute campaign after approval.
+        This checks approval status before executing.
+        """
+        try:
+            # Check approval status
+            approval_request = await self.approval_manager.get_approval_request(approval_request_id)
+
+            if not approval_request:
+                # Check in database
+                db_request = await self.db.approval_requests.find_one(
+                    {"request_id": approval_request_id}
+                )
+                if not db_request or db_request.get("status") != "approved":
+                    return {
+                        "status": "error",
+                        "message": "Campaign execution not approved"
+                    }
+            elif approval_request.status.value != "approved":
+                return {
+                    "status": "error",
+                    "message": f"Campaign is {approval_request.status.value}, not approved"
+                }
+
+            # Execute campaign
+            logger.info(f"Executing approved campaign: {campaign_id}")
+            result = await self.execute_campaign_plan(campaign_id)
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error executing campaign with approval: {str(e)}")
+            raise
+
+    async def get_campaign_status_stream(self, campaign_id: str):
+        """
+        Generator function for streaming campaign execution status.
+        Yields updates as tasks complete.
+        """
+        campaign = await self.db.campaigns.find_one({"campaign_id": campaign_id})
+        if not campaign:
+            yield {"error": "Campaign not found"}
+            return
+
+        # Yield initial status
+        yield {
+            "status": campaign.get("status"),
+            "message": "Campaign execution started"
+        }
+
+        # Monitor task completion
+        while True:
+            await asyncio.sleep(2)  # Poll every 2 seconds
+
+            campaign = await self.db.campaigns.find_one({"campaign_id": campaign_id})
+            current_status = campaign.get("status")
+
+            yield {
+                "status": current_status,
+                "plan": campaign.get("plan"),
+                "results": campaign.get("results", {})
+            }
+
+            if current_status in ["completed", "failed"]:
+                break

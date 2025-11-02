@@ -145,19 +145,19 @@ async def initialize_database():
         # Don't fail the app, continue with warnings
         pass
 
-# Initialize services
-orchestrator = AgentOrchestrator(db)
+# Initialize Zoho services FIRST (so orchestrator can use them)
+zoho_auth = ZohoAuthService(db)
+zoho_crm = ZohoCRMService(zoho_auth)
+zoho_mail = ZohoMailService(zoho_auth)
+zoho_campaigns = ZohoCampaignsService(zoho_auth)
+
+# Initialize services with Zoho CRM integration
+orchestrator = AgentOrchestrator(db, zoho_crm_service=zoho_crm)
 integrated_supervisor = IntegratedSupervisor(db)  # New integrated supervisor
 voice_service = VoiceService()
 social_media_service = SocialMediaService()
 vector_memory = VectorMemoryService(db)
 collaboration_system = AgentCollaborationSystem(db)
-
-# Initialize Zoho services
-zoho_auth = ZohoAuthService(db)
-zoho_crm = ZohoCRMService(zoho_auth)
-zoho_mail = ZohoMailService(zoho_auth)
-zoho_campaigns = ZohoCampaignsService(zoho_auth)
 zoho_analytics = ZohoAnalyticsService(zoho_auth)
 
 # Initialize social media integration service
@@ -527,9 +527,112 @@ async def list_campaigns(limit: int = Query(default=50, le=100)):
     try:
         campaigns = await orchestrator.list_campaigns(limit=limit)
         return {"campaigns": campaigns, "count": len(campaigns)}
-        
+
     except Exception as e:
         logger.error(f"Error listing campaigns: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== NEW: Campaign Approval Workflow ====================
+
+@api_router.post("/campaigns/with-approval")
+async def create_campaign_with_approval(brief: CampaignBrief):
+    """
+    Create campaign with approval workflow.
+
+    This endpoint:
+    1. Creates campaign
+    2. Generates plan using Planning Agent
+    3. Returns plan for user review
+    4. Waits for approval before execution
+    """
+    try:
+        result = await orchestrator.create_campaign_with_approval(
+            campaign_brief=brief.model_dump(),
+            conversation_id=brief.model_dump().get("conversation_id")
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"Error creating campaign with approval: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/campaigns/{campaign_id}/approve")
+async def approve_campaign(campaign_id: str, approval_request_id: str):
+    """
+    Approve a campaign execution.
+
+    After user reviews the plan, they call this endpoint to approve.
+    This triggers campaign execution.
+    """
+    try:
+        # Approve the request
+        approval_result = await orchestrator.approval_manager.approve_request(
+            request_id=approval_request_id
+        )
+
+        if approval_result["status"] != "approved":
+            raise HTTPException(status_code=400, detail=approval_result["message"])
+
+        # Execute the campaign
+        result = await orchestrator.execute_campaign_with_approval(
+            campaign_id=campaign_id,
+            approval_request_id=approval_request_id
+        )
+
+        return {
+            "status": "approved_and_executing",
+            "message": "Campaign approved and execution started",
+            "campaign_id": campaign_id,
+            "execution_result": result
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error approving campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/campaigns/{campaign_id}/reject")
+async def reject_campaign(campaign_id: str, approval_request_id: str, reason: str = None):
+    """
+    Reject a campaign execution.
+    """
+    try:
+        result = await orchestrator.approval_manager.reject_request(
+            request_id=approval_request_id,
+            notes=reason
+        )
+
+        # Update campaign status
+        await db.campaigns.update_one(
+            {"campaign_id": campaign_id},
+            {"$set": {"status": "rejected", "rejection_reason": reason}}
+        )
+
+        return {
+            "status": "rejected",
+            "message": "Campaign rejected",
+            "campaign_id": campaign_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error rejecting campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/approval-requests/pending")
+async def get_pending_approvals():
+    """
+    Get all pending approval requests.
+    """
+    try:
+        pending = await orchestrator.approval_manager.get_pending_requests()
+        return {
+            "pending_requests": [req.to_dict() for req in pending],
+            "count": len(pending)
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching pending approvals: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== Analytics Endpoints ====================
