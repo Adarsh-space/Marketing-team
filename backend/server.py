@@ -1314,20 +1314,13 @@ async def zoho_callback(code: str = None, state: str = None, error: str = None):
         )
 
         if result.get("status") == "success":
+            logger.info("✅ Zoho OAuth successful, tokens stored")
             return RedirectResponse(
                 url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=connected"
             )
         else:
             return RedirectResponse(
                 url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
-            logger.info("✅ Zoho OAuth successful, tokens stored")
-            return HTMLResponse(
-                content=f"""
-                <html>
-                    <head><title>Zoho Connected Successfully</title></head>
-                    <body style="font-family: Arial; padding: 50px; text-align: center;">
-                        <h2 style="color: #28a745;">✅ Zoho Connected Successfully!</h2>
-                        <p>Your Zoho account has been connected.</p>
                         <p>Redirecting to settings...</p>
                         <script>
                             setTimeout(function() {{
