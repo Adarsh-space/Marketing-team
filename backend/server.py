@@ -1314,6 +1314,12 @@ async def zoho_callback(code: str = None, state: str = None, error: str = None):
         )
 
         if result.get("status") == "success":
+            return RedirectResponse(
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=connected"
+            )
+        else:
+            return RedirectResponse(
+                url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
             logger.info("✅ Zoho OAuth successful, tokens stored")
             return HTMLResponse(
                 content=f"""
@@ -1357,6 +1363,9 @@ async def zoho_callback(code: str = None, state: str = None, error: str = None):
             )
 
     except Exception as e:
+        logger.error(f"Zoho OAuth callback error: {str(e)}")
+        return RedirectResponse(
+            url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
         logger.error(f"Zoho OAuth callback error: {str(e)}", exc_info=True)
         return HTMLResponse(
             content=f"""
