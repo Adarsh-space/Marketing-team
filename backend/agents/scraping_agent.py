@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, List
 import logging
 from .base_agent import BaseAgent
 
