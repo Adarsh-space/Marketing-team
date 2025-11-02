@@ -165,7 +165,7 @@ social_media_integration = SocialMediaIntegrationService(zoho_crm, db)
 
 # Initialize new integration services
 oauth_manager = OAuthManager(client)
-unified_social_service = UnifiedSocialService(client, oauth_manager)
+unified_social_service = UnifiedSocialService(db)
 analytics_aggregator = AnalyticsAggregator(client, oauth_manager)
 job_scheduler = JobScheduler(client, oauth_manager, unified_social_service, analytics_aggregator)
 
