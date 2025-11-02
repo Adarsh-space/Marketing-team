@@ -32,6 +32,22 @@ from zoho_analytics_service import ZohoAnalyticsService
 # Import social media integration service
 from social_media_integration_service import SocialMediaIntegrationService
 
+# Import new integration services
+from unified_social_service import UnifiedSocialService
+from oauth_manager import OAuthManager
+from analytics_aggregator import AnalyticsAggregator
+from job_scheduler import JobScheduler
+
+# Import new feature services
+from tenant_service import TenantService
+from auth_service import AuthService
+from credits_service import CreditsService
+from payment_service import PaymentService
+from scraping_service import ScrapingService
+from zoho_marketing_automation_service import ZohoMarketingAutomationService
+from zoho_flow_service import ZohoFlowService
+from zoho_salesiq_service import ZohoSalesIQService
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -72,10 +88,19 @@ async def initialize_database():
             "agent_events",
             "agent_tasks",
             "zoho_tokens",  # Zoho OAuth tokens
-            "social_credentials",  # Social media credentials
+            "social_credentials",  # Social media credentials (legacy)
+            "oauth_states",  # OAuth state management
+            "social_accounts",  # Connected social media accounts
+            "social_posts",  # Social media posts
+            "analytics_data",  # Analytics data
+            "scheduled_jobs",  # Job scheduler
+            "email_campaigns",  # Email campaigns
+            "content_library",  # Content library
+            "zoho_crm_records",  # Zoho CRM data
             "settings",
             "published_content",
-            "approval_requests"  # Approval workflow
+            "approval_requests",  # Approval workflow
+            "users"  # User profiles
         ]
         
         # Create missing collections
@@ -93,6 +118,21 @@ async def initialize_database():
         await db.user_memory.create_index("user_id")
         await db.agent_memory.create_index("agent_name")
         await db.agent_events.create_index([("conversation_id", 1), ("timestamp", -1)])
+
+        # New collection indexes
+        await db.users.create_index("user_id", unique=True)
+        await db.oauth_states.create_index("state", unique=True)
+        await db.oauth_states.create_index("expires_at")
+        await db.social_accounts.create_index("account_id", unique=True)
+        await db.social_accounts.create_index("user_id")
+        await db.social_posts.create_index("post_id", unique=True)
+        await db.social_posts.create_index("user_id")
+        await db.analytics_data.create_index([("platform", 1), ("identifier", 1), ("date", -1)])
+        await db.scheduled_jobs.create_index([("user_id", 1), ("status", 1)])
+        await db.scheduled_jobs.create_index("scheduled_time")
+        await db.email_campaigns.create_index("campaign_id", unique=True)
+        await db.content_library.create_index("user_id")
+        await db.zoho_crm_records.create_index([("user_id", 1), ("module", 1)])
         
         logger.info("✅ Database initialization complete!")
         
@@ -123,9 +163,32 @@ zoho_analytics = ZohoAnalyticsService(zoho_auth)
 # Initialize social media integration service
 social_media_integration = SocialMediaIntegrationService(zoho_crm, db)
 
-# Update SocialMediaAgent with social media service
+# Initialize new integration services
+oauth_manager = OAuthManager(client)
+unified_social_service = UnifiedSocialService(client, oauth_manager)
+analytics_aggregator = AnalyticsAggregator(client, oauth_manager)
+job_scheduler = JobScheduler(client, oauth_manager, unified_social_service, analytics_aggregator)
+
+# Initialize new feature services
+tenant_service = TenantService(zoho_crm, db)
+jwt_secret = os.getenv("JWT_SECRET", "default-secret-change-this-in-production")
+auth_service = AuthService(zoho_crm, tenant_service, db, jwt_secret)
+credits_service = CreditsService(tenant_service, db)
+stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
+payment_service = PaymentService(credits_service, tenant_service, stripe_key)
+google_maps_key = os.getenv("GOOGLE_MAPS_API_KEY", "")
+scraping_service = ScrapingService(zoho_crm, credits_service, google_maps_key)
+zoho_marketing_automation = ZohoMarketingAutomationService(zoho_auth)
+zoho_flow = ZohoFlowService(zoho_auth)
+zoho_salesiq = ZohoSalesIQService(zoho_auth)
+
+# Update SocialMediaAgent with all services
 from agents.social_media_agent import SocialMediaAgent
-social_media_agent = SocialMediaAgent(social_media_integration)
+social_media_agent = SocialMediaAgent(
+    social_media_service=social_media_integration,  # Legacy service
+    unified_social_service=unified_social_service,  # New unified service
+    job_scheduler=job_scheduler  # Job scheduler
+)
 
 # Create the main app
 app = FastAPI(
@@ -1771,6 +1834,552 @@ async def ai_generate_and_post(data: Dict[str, Any]):
         logger.error(f"Error in AI post: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# ==================== Social Media OAuth & Connection ====================
+
+@api_router.get("/social/connect/{platform}")
+async def get_social_oauth_url(
+    platform: str,
+    user_id: str = Query("default_user"),
+    redirect_uri: str = Query(None)
+):
+    """
+    Get OAuth authorization URL for social media platform
+    Platforms: facebook, instagram, twitter, linkedin
+    """
+    try:
+        if not redirect_uri:
+            redirect_uri = f"{os.getenv('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/api/social/callback/{platform}"
+
+        result = await unified_social_service.get_auth_url(
+            platform=platform,
+            user_id=user_id,
+            redirect_uri=redirect_uri
+        )
+
+        return result
+    except Exception as e:
+        logger.error(f"Error getting OAuth URL for {platform}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social/callback/{platform}")
+async def handle_social_oauth_callback(
+    platform: str,
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None)
+):
+    """
+    Handle OAuth callback from social media platforms
+    """
+    try:
+        frontend_url = os.getenv('REACT_APP_FRONTEND_URL', 'http://localhost:3000')
+
+        if error:
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">Connection Failed</h2>
+                        <p>Error: {error}</p>
+                        <p>Redirecting...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?error={error}";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
+            )
+
+        if not code or not state:
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">Connection Failed</h2>
+                        <p>Missing required parameters</p>
+                        <p>Redirecting...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?error=missing_params";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
+            )
+
+        # Validate state and exchange code for tokens
+        state_validation = await oauth_manager.validate_state(state, platform)
+
+        if not state_validation['valid']:
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">Connection Failed</h2>
+                        <p>Invalid or expired state</p>
+                        <p>Redirecting...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?error=invalid_state";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
+            )
+
+        user_id = state_validation['user_id']
+        redirect_uri = state_validation['redirect_uri']
+
+        # Exchange code for tokens
+        result = await unified_social_service.handle_oauth_callback(
+            platform=platform,
+            code=code,
+            state=state,
+            user_id=user_id
+        )
+
+        if result['success']:
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>{platform.title()} Connected</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #28a745;">✅ {platform.title()} Connected Successfully!</h2>
+                        <p>Your {platform} account has been connected.</p>
+                        <p>Redirecting...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?connected={platform}";
+                            }}, 1500);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
+            )
+        else:
+            return HTMLResponse(
+                content=f"""
+                <html>
+                    <head><title>Connection Failed</title></head>
+                    <body style="font-family: Arial; padding: 50px; text-align: center;">
+                        <h2 style="color: #dc3545;">Connection Failed</h2>
+                        <p>{result.get('error', 'Unknown error')}</p>
+                        <p>Redirecting...</p>
+                        <script>
+                            setTimeout(function() {{
+                                window.location.href = "{frontend_url}/settings?error=connection_failed";
+                            }}, 2000);
+                        </script>
+                    </body>
+                </html>
+                """,
+                status_code=200
+            )
+
+    except Exception as e:
+        logger.error(f"Error in OAuth callback for {platform}: {str(e)}")
+        frontend_url = os.getenv('REACT_APP_FRONTEND_URL', 'http://localhost:3000')
+        return HTMLResponse(
+            content=f"""
+            <html>
+                <head><title>Connection Error</title></head>
+                <body style="font-family: Arial; padding: 50px; text-align: center;">
+                    <h2 style="color: #dc3545;">Connection Error</h2>
+                    <p>An error occurred: {str(e)}</p>
+                    <p>Redirecting...</p>
+                    <script>
+                        setTimeout(function() {{
+                            window.location.href = "{frontend_url}/settings?error=server_error";
+                        }}, 2000);
+                    </script>
+                </body>
+            </html>
+            """,
+            status_code=200
+        )
+
+@api_router.get("/social/accounts")
+async def get_connected_accounts(
+    user_id: str = Query("default_user"),
+    platform: str = Query(None)
+):
+    """
+    Get all connected social media accounts for a user
+    """
+    try:
+        result = await unified_social_service.get_connected_accounts(
+            user_id=user_id,
+            platform=platform
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error getting connected accounts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/social/accounts/{account_id}")
+async def disconnect_social_account(
+    account_id: str,
+    user_id: str = Query("default_user")
+):
+    """
+    Disconnect a social media account
+    """
+    try:
+        result = await unified_social_service.disconnect_account(
+            account_id=account_id,
+            user_id=user_id
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error disconnecting account: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Enhanced Social Media Posting ====================
+
+@api_router.post("/social/post")
+async def post_to_social_media(data: Dict[str, Any]):
+    """
+    Post content to a single social media account
+
+    Expected data:
+    {
+        "account_id": "account123",
+        "content": {
+            "text": "Post text",
+            "image_url": "https://...", (optional)
+            "video_url": "https://...", (optional)
+            "link": "https://..." (optional)
+        },
+        "user_id": "user123"
+    }
+    """
+    try:
+        result = await unified_social_service.post_to_platform(
+            account_id=data.get('account_id'),
+            content=data.get('content'),
+            user_id=data.get('user_id', 'default_user')
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error posting to social media: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/social/post/multiple")
+async def post_to_multiple_accounts(data: Dict[str, Any]):
+    """
+    Post same content to multiple social media accounts
+
+    Expected data:
+    {
+        "account_ids": ["account1", "account2"],
+        "content": {
+            "text": "Post text",
+            "image_url": "https://...", (optional)
+        },
+        "user_id": "user123"
+    }
+    """
+    try:
+        result = await unified_social_service.post_to_multiple(
+            account_ids=data.get('account_ids', []),
+            content=data.get('content'),
+            user_id=data.get('user_id', 'default_user')
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error posting to multiple accounts: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/social/post/schedule")
+async def schedule_social_post(data: Dict[str, Any]):
+    """
+    Schedule a post for later
+
+    Expected data:
+    {
+        "account_ids": ["account1", "account2"],
+        "content": {
+            "text": "Post text",
+            "image_url": "https://..."
+        },
+        "scheduled_time": "2024-01-20T15:30:00Z",
+        "user_id": "user123"
+    }
+    """
+    try:
+        scheduled_time = datetime.fromisoformat(data.get('scheduled_time').replace('Z', '+00:00'))
+
+        result = await job_scheduler.schedule_post(
+            user_id=data.get('user_id', 'default_user'),
+            account_ids=data.get('account_ids', []),
+            content=data.get('content'),
+            scheduled_time=scheduled_time,
+            metadata=data.get('metadata')
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error scheduling post: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Social Media Analytics ====================
+
+@api_router.get("/social/analytics/{platform}/{account_id}")
+async def get_social_analytics(
+    platform: str,
+    account_id: str,
+    post_id: str = Query(None),
+    date_from: str = Query(None),
+    date_to: str = Query(None)
+):
+    """
+    Get analytics for social media account or specific post
+    """
+    try:
+        date_from_obj = datetime.fromisoformat(date_from) if date_from else None
+        date_to_obj = datetime.fromisoformat(date_to) if date_to else None
+
+        if platform == 'facebook':
+            result = await analytics_aggregator.fetch_facebook_insights(
+                account_id=account_id,
+                post_id=post_id,
+                date_from=date_from_obj,
+                date_to=date_to_obj
+            )
+        elif platform == 'instagram':
+            result = await analytics_aggregator.fetch_instagram_insights(
+                account_id=account_id,
+                post_id=post_id,
+                date_from=date_from_obj,
+                date_to=date_to_obj
+            )
+        elif platform == 'twitter':
+            result = await analytics_aggregator.fetch_twitter_analytics(
+                account_id=account_id,
+                tweet_id=post_id
+            )
+        elif platform == 'linkedin':
+            result = await analytics_aggregator.fetch_linkedin_analytics(
+                account_id=account_id,
+                post_id=post_id
+            )
+        else:
+            raise HTTPException(status_code=400, detail=f"Unsupported platform: {platform}")
+
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social/analytics/aggregate")
+async def get_aggregated_analytics(
+    user_id: str = Query("default_user"),
+    date_from: str = Query(None),
+    date_to: str = Query(None)
+):
+    """
+    Get aggregated analytics from all connected platforms
+    """
+    try:
+        date_from_obj = datetime.fromisoformat(date_from) if date_from else None
+        date_to_obj = datetime.fromisoformat(date_to) if date_to else None
+
+        result = await analytics_aggregator.aggregate_all_analytics(
+            user_id=user_id,
+            date_from=date_from_obj,
+            date_to=date_to_obj
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error aggregating analytics: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social/analytics/history")
+async def get_analytics_history(
+    user_id: str = Query("default_user"),
+    platform: str = Query(None),
+    days: int = Query(30)
+):
+    """
+    Get historical analytics data
+    """
+    try:
+        result = await analytics_aggregator.get_analytics_history(
+            user_id=user_id,
+            platform=platform,
+            days=days
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error getting analytics history: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Job Scheduler ====================
+
+@api_router.get("/jobs/status/{job_id}")
+async def get_job_status(job_id: str):
+    """
+    Get status of a scheduled job
+    """
+    try:
+        result = await job_scheduler.get_job_status(job_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting job status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/jobs/user")
+async def get_user_jobs(
+    user_id: str = Query("default_user"),
+    status: str = Query(None),
+    job_type: str = Query(None)
+):
+    """
+    Get all jobs for a user
+    """
+    try:
+        result = await job_scheduler.get_user_jobs(
+            user_id=user_id,
+            status=status,
+            job_type=job_type
+        )
+        return result
+    except Exception as e:
+        logger.error(f"Error getting user jobs: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.delete("/jobs/{job_id}")
+async def cancel_job(job_id: str):
+    """
+    Cancel a scheduled job
+    """
+    try:
+        result = await job_scheduler.cancel_job(job_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error cancelling job: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/jobs/scheduler/status")
+async def get_scheduler_status():
+    """
+    Get job scheduler status
+    """
+    try:
+        result = await job_scheduler.get_scheduler_status()
+        return result
+    except Exception as e:
+        logger.error(f"Error getting scheduler status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/jobs/scheduler/start")
+async def start_scheduler():
+    """
+    Start the job scheduler
+    """
+    try:
+        result = await job_scheduler.start()
+        return result
+    except Exception as e:
+        logger.error(f"Error starting scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/jobs/scheduler/stop")
+async def stop_scheduler():
+    """
+    Stop the job scheduler
+    """
+    try:
+        result = await job_scheduler.stop()
+        return result
+    except Exception as e:
+        logger.error(f"Error stopping scheduler: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Dashboard & Token Management ====================
+
+@api_router.get("/dashboard/overview")
+async def get_dashboard_overview(user_id: str = Query("default_user")):
+    """
+    Get complete dashboard overview with all metrics
+    """
+    try:
+        # Get token status
+        token_status = await oauth_manager.get_token_status(user_id)
+
+        # Get connected accounts
+        accounts_result = await unified_social_service.get_connected_accounts(user_id)
+
+        # Get recent jobs
+        jobs_result = await job_scheduler.get_user_jobs(user_id, status='pending')
+
+        # Get aggregated analytics (last 30 days)
+        analytics_result = await analytics_aggregator.aggregate_all_analytics(
+            user_id=user_id,
+            date_from=datetime.utcnow() - timedelta(days=30),
+            date_to=datetime.utcnow()
+        )
+
+        return {
+            'success': True,
+            'user_id': user_id,
+            'token_status': token_status,
+            'connected_accounts': accounts_result.get('accounts', []),
+            'pending_jobs': jobs_result.get('jobs', []),
+            'analytics': analytics_result.get('data', {}) if analytics_result.get('success') else {}
+        }
+    except Exception as e:
+        logger.error(f"Error getting dashboard overview: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.post("/tokens/refresh")
+async def refresh_tokens(
+    user_id: str = Query("default_user"),
+    platform: str = Query(None)
+):
+    """
+    Manually refresh access tokens
+    """
+    try:
+        if platform:
+            # Refresh specific platform (social media)
+            account_result = await unified_social_service.get_connected_accounts(user_id, platform)
+            if account_result['success'] and account_result['accounts']:
+                account_id = account_result['accounts'][0]['account_id']
+                result = await oauth_manager.refresh_social_token(account_id, platform)
+            else:
+                raise HTTPException(status_code=404, detail="No account found for platform")
+        else:
+            # Refresh all expiring tokens
+            result = await oauth_manager.refresh_expiring_tokens(hours_threshold=24)
+
+        return result
+    except Exception as e:
+        logger.error(f"Error refreshing tokens: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/tokens/status")
+async def get_token_status(user_id: str = Query("default_user")):
+    """
+    Get status of all tokens for a user
+    """
+    try:
+        result = await oauth_manager.get_token_status(user_id)
+        return result
+    except Exception as e:
+        logger.error(f"Error getting token status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ==================== Health Check ====================
 
 @api_router.get("/health")
@@ -1813,11 +2422,118 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_db_client():
-    """Initialize database on startup."""
+    """Initialize database and services on startup."""
     await initialize_database()
+
+    # Start job scheduler
+    logger.info("Starting job scheduler...")
+    await job_scheduler.start()
+
     logger.info("✅ Application startup complete")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    """Shutdown services and database."""
+    # Stop job scheduler
+    logger.info("Stopping job scheduler...")
+    await job_scheduler.stop()
+
+    # Close database connection
     client.close()
     logger.info("Application shutdown complete")
+
+# ==================== Authentication Endpoints ====================
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    company_name: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+@api_router.post("/auth/signup")
+async def signup(request: SignupRequest):
+    result = await auth_service.signup(
+        email=request.email,
+        password=request.password,
+        full_name=request.full_name,
+        company_name=request.company_name
+    )
+    return result
+
+@api_router.post("/auth/login")
+async def login(request: LoginRequest):
+    result = await auth_service.login(request.email, request.password)
+    return result
+
+@api_router.post("/auth/logout")
+async def logout(token: str):
+    result = await auth_service.logout(token)
+    return result
+
+@api_router.get("/credits/balance")
+async def get_credits_balance(tenant_id: str):
+    tenant = await tenant_service.get_tenant(tenant_id)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Tenant not found")
+    return {"status": "success", "credits_balance": tenant["credits_balance"], "plan_type": tenant["plan_type"]}
+
+@api_router.get("/credits/usage")
+async def get_usage_summary(tenant_id: str, days: int = 30):
+    result = await credits_service.get_usage_summary(tenant_id, days)
+    return result
+
+@api_router.get("/credits/history")
+async def get_transaction_history(tenant_id: str):
+    transactions = await credits_service.get_transaction_history(tenant_id)
+    return {"status": "success", "transactions": transactions}
+
+@api_router.get("/payment/packages")
+async def get_packages():
+    return payment_service.get_available_packages()
+
+class CheckoutRequest(BaseModel):
+    tenant_id: str
+    package_name: str
+    success_url: str
+    cancel_url: str
+
+@api_router.post("/payment/checkout")
+async def create_checkout(request: CheckoutRequest):
+    result = await payment_service.create_checkout_session(
+        request.tenant_id, request.package_name, request.success_url, request.cancel_url
+    )
+    return result
+
+class GoogleMapsScrapingRequest(BaseModel):
+    tenant_id: str
+    query: str
+    location: str
+    max_results: int = 20
+
+@api_router.post("/scraping/google-maps")
+async def scrape_google_maps(request: GoogleMapsScrapingRequest):
+    result = await scraping_service.scrape_google_maps(
+        request.tenant_id, request.query, request.location, request.max_results
+    )
+    return result
+
+class WebsiteScrapingRequest(BaseModel):
+    tenant_id: str
+    url: str
+    extract_emails: bool = True
+    extract_phones: bool = True
+    extract_links: bool = False
+
+@api_router.post("/scraping/website")
+async def scrape_website(request: WebsiteScrapingRequest):
+    result = await scraping_service.scrape_website(
+        request.tenant_id, request.url, request.extract_emails, 
+        request.extract_phones, request.extract_links
+    )
+    return result
+
+logger.info("✅ All API endpoints loaded")
