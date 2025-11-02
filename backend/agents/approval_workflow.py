@@ -155,7 +155,7 @@ class ApprovalWorkflowManager:
         self.pending_requests[request_id] = request
 
         # Persist to database if available
-        if self.db:
+        if self.db is not None:
             await self.db.approval_requests.insert_one({
                 **request.to_dict(),
                 "conversation_id": conversation_id
