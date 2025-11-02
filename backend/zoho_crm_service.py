@@ -502,3 +502,378 @@ class ZohoCRMService:
         except Exception as e:
             logger.error(f"Error getting module fields: {str(e)}")
             return {"status": "error", "message": str(e)}
+
+    # ============================================================
+    # CAMPAIGN DATA MANAGEMENT - Save Scraped Contacts & Content
+    # ============================================================
+
+    async def save_scraped_contacts(
+        self,
+        contacts: List[Dict[str, Any]],
+        campaign_id: str,
+        user_id: str = "default_user"
+    ) -> Dict[str, Any]:
+        """
+        Save scraped contacts to Zoho CRM Leads module and link to campaign.
+
+        Args:
+            contacts: List of contact dictionaries with name, email, phone, etc.
+            campaign_id: Zoho CRM campaign ID to link contacts to
+            user_id: User identifier
+
+        Returns:
+            Dict with save status and created lead IDs
+        """
+        try:
+            headers = await self._get_headers(user_id)
+            if not headers:
+                return {"status": "error", "message": "No valid Zoho connection"}
+
+            # Format contacts for Zoho Leads module
+            leads_data = []
+            for contact in contacts:
+                # Split name into first and last name
+                name_parts = contact.get("name", "Unknown").split(" ", 1)
+                first_name = name_parts[0]
+                last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+                lead = {
+                    "First_Name": first_name,
+                    "Last_Name": last_name,
+                    "Email": contact.get("email"),
+                    "Phone": contact.get("phone"),
+                    "Company": contact.get("company", contact.get("business_name")),
+                    "Website": contact.get("website"),
+                    "Street": contact.get("address", contact.get("street")),
+                    "City": contact.get("city"),
+                    "State": contact.get("state"),
+                    "Zip_Code": contact.get("zip_code", contact.get("postal_code")),
+                    "Country": contact.get("country"),
+                    "Lead_Source": "Scraped Data",
+                    "Lead_Status": "Not Contacted",
+                    "Description": f"Scraped for campaign {campaign_id}",
+                    # Custom fields
+                    "Rating": contact.get("rating"),
+                    "Industry": contact.get("industry"),
+                    # Link to campaign
+                    "$se_module": "Campaigns",
+                    "$campaigns": [{"id": campaign_id}]
+                }
+
+                # Remove None values
+                lead = {k: v for k, v in lead.items() if v is not None}
+                leads_data.append(lead)
+
+            # Zoho allows max 100 records per API call, batch if needed
+            created_leads = []
+            batch_size = 100
+
+            for i in range(0, len(leads_data), batch_size):
+                batch = leads_data[i:i + batch_size]
+                zoho_payload = {"data": batch}
+                url = f"{self.API_BASE_URL}/Leads"
+
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(url, headers=headers, json=zoho_payload)
+
+                    if response.status_code in [200, 201]:
+                        result = response.json()
+                        for record in result.get("data", []):
+                            if record.get("status") == "success":
+                                created_leads.append({
+                                    "id": record["details"]["id"],
+                                    "email": batch[result["data"].index(record)].get("Email")
+                                })
+                        logger.info(f"Created {len(batch)} leads in Zoho CRM")
+                    else:
+                        error_data = response.json()
+                        logger.error(f"Failed to create leads batch: {error_data}")
+
+            return {
+                "status": "success",
+                "message": f"Successfully saved {len(created_leads)} contacts to Zoho CRM",
+                "created_leads": created_leads,
+                "total_contacts": len(contacts),
+                "successful": len(created_leads),
+                "campaign_id": campaign_id
+            }
+
+        except Exception as e:
+            logger.error(f"Error saving scraped contacts: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    async def get_campaign_contacts(
+        self,
+        campaign_id: str,
+        user_id: str = "default_user"
+    ) -> Dict[str, Any]:
+        """
+        Get all contacts/leads associated with a campaign.
+
+        Args:
+            campaign_id: Zoho CRM campaign ID
+            user_id: User identifier
+
+        Returns:
+            Dict with contact list
+        """
+        try:
+            headers = await self._get_headers(user_id)
+            if not headers:
+                return {"status": "error", "message": "No valid Zoho connection"}
+
+            # Get leads linked to this campaign
+            url = f"{self.API_BASE_URL}/Campaigns/{campaign_id}/Leads"
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, headers=headers)
+
+                if response.status_code == 200:
+                    result = response.json()
+                    contacts = result.get("data", [])
+
+                    return {
+                        "status": "success",
+                        "contacts": contacts,
+                        "count": len(contacts),
+                        "campaign_id": campaign_id
+                    }
+                else:
+                    logger.warning(f"No contacts found for campaign {campaign_id}")
+                    return {
+                        "status": "success",
+                        "contacts": [],
+                        "count": 0,
+                        "campaign_id": campaign_id
+                    }
+
+        except Exception as e:
+            logger.error(f"Error getting campaign contacts: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    async def save_campaign_content(
+        self,
+        campaign_id: str,
+        content_data: Dict[str, Any],
+        user_id: str = "default_user"
+    ) -> Dict[str, Any]:
+        """
+        Save generated content to campaign notes/description.
+
+        Args:
+            campaign_id: Zoho CRM campaign ID
+            content_data: Content generated by ContentAgent
+            user_id: User identifier
+
+        Returns:
+            Dict with save status
+        """
+        try:
+            headers = await self._get_headers(user_id)
+            if not headers:
+                return {"status": "error", "message": "No valid Zoho connection"}
+
+            # Format content for campaign description/notes
+            content_text = f"""
+=== GENERATED CAMPAIGN CONTENT ===
+
+Subject Line: {content_data.get('subject_line', 'N/A')}
+Preview Text: {content_data.get('preview_text', 'N/A')}
+
+Email Body:
+{content_data.get('body', content_data.get('text', 'N/A'))}
+
+Call-to-Action: {content_data.get('cta', content_data.get('cta_text', 'N/A'))}
+
+Personalization Tokens: {', '.join(content_data.get('personalization_tokens', []))}
+
+Variants:
+{chr(10).join(f'- {v}' for v in content_data.get('variants', []))}
+
+Generated by: ContentAgent
+Timestamp: {datetime.now(timezone.utc).isoformat()}
+"""
+
+            # Update campaign with content
+            update_data = {
+                "Description": content_text,
+                "Content_Generated": True,
+                "Content_Type": content_data.get("content_type", "email")
+            }
+
+            result = await self.update_campaign(campaign_id, update_data, user_id)
+
+            if result["status"] == "success":
+                logger.info(f"Saved content to campaign {campaign_id}")
+                return {
+                    "status": "success",
+                    "message": "Campaign content saved to Zoho CRM",
+                    "campaign_id": campaign_id
+                }
+            else:
+                return result
+
+        except Exception as e:
+            logger.error(f"Error saving campaign content: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    async def get_campaign_content(
+        self,
+        campaign_id: str,
+        user_id: str = "default_user"
+    ) -> Dict[str, Any]:
+        """
+        Get campaign content from Zoho CRM.
+
+        Args:
+            campaign_id: Zoho CRM campaign ID
+            user_id: User identifier
+
+        Returns:
+            Dict with campaign content
+        """
+        try:
+            campaign_result = await self.get_campaign(campaign_id, user_id)
+
+            if campaign_result["status"] == "success":
+                campaign = campaign_result["campaign"]
+                content = {
+                    "description": campaign.get("Description", ""),
+                    "content_generated": campaign.get("Content_Generated", False),
+                    "content_type": campaign.get("Content_Type", ""),
+                    "campaign_name": campaign.get("Campaign_Name", "")
+                }
+
+                return {
+                    "status": "success",
+                    "content": content
+                }
+            else:
+                return campaign_result
+
+        except Exception as e:
+            logger.error(f"Error getting campaign content: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    async def bulk_create_contacts(
+        self,
+        contacts: List[Dict[str, Any]],
+        user_id: str = "default_user"
+    ) -> Dict[str, Any]:
+        """
+        Bulk create contacts in Zoho CRM Contacts module (not Leads).
+
+        Args:
+            contacts: List of contact dictionaries
+            user_id: User identifier
+
+        Returns:
+            Dict with creation status
+        """
+        try:
+            headers = await self._get_headers(user_id)
+            if not headers:
+                return {"status": "error", "message": "No valid Zoho connection"}
+
+            # Format contacts for Zoho Contacts module
+            contacts_data = []
+            for contact in contacts:
+                name_parts = contact.get("name", "Unknown").split(" ", 1)
+                first_name = name_parts[0]
+                last_name = name_parts[1] if len(name_parts) > 1 else ""
+
+                contact_record = {
+                    "First_Name": first_name,
+                    "Last_Name": last_name,
+                    "Email": contact.get("email"),
+                    "Phone": contact.get("phone"),
+                    "Mailing_Street": contact.get("address", contact.get("street")),
+                    "Mailing_City": contact.get("city"),
+                    "Mailing_State": contact.get("state"),
+                    "Mailing_Zip": contact.get("zip_code"),
+                    "Mailing_Country": contact.get("country"),
+                    "Description": contact.get("description", "Imported via scraping")
+                }
+
+                # Remove None values
+                contact_record = {k: v for k, v in contact_record.items() if v is not None}
+                contacts_data.append(contact_record)
+
+            # Batch create (max 100 per request)
+            created_contacts = []
+            batch_size = 100
+
+            for i in range(0, len(contacts_data), batch_size):
+                batch = contacts_data[i:i + batch_size]
+                zoho_payload = {"data": batch}
+                url = f"{self.API_BASE_URL}/Contacts"
+
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.post(url, headers=headers, json=zoho_payload)
+
+                    if response.status_code in [200, 201]:
+                        result = response.json()
+                        for record in result.get("data", []):
+                            if record.get("status") == "success":
+                                created_contacts.append(record["details"]["id"])
+
+            return {
+                "status": "success",
+                "message": f"Created {len(created_contacts)} contacts in Zoho CRM",
+                "created_contacts": created_contacts,
+                "total": len(contacts)
+            }
+
+        except Exception as e:
+            logger.error(f"Error bulk creating contacts: {str(e)}")
+            return {"status": "error", "message": str(e)}
+
+    async def link_contacts_to_campaign(
+        self,
+        campaign_id: str,
+        contact_ids: List[str],
+        user_id: str = "default_user"
+    ) -> Dict[str, Any]:
+        """
+        Link existing contacts to a campaign.
+
+        Args:
+            campaign_id: Zoho CRM campaign ID
+            contact_ids: List of contact/lead IDs
+            user_id: User identifier
+
+        Returns:
+            Dict with link status
+        """
+        try:
+            headers = await self._get_headers(user_id)
+            if not headers:
+                return {"status": "error", "message": "No valid Zoho connection"}
+
+            # Use Associate Records API
+            url = f"{self.API_BASE_URL}/Campaigns/{campaign_id}/Leads"
+
+            # Zoho expects list of lead IDs
+            payload = {
+                "data": [{"id": contact_id} for contact_id in contact_ids]
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.put(url, headers=headers, json=payload)
+
+                if response.status_code == 200:
+                    return {
+                        "status": "success",
+                        "message": f"Linked {len(contact_ids)} contacts to campaign",
+                        "campaign_id": campaign_id
+                    }
+                else:
+                    error_data = response.json()
+                    return {
+                        "status": "error",
+                        "message": error_data.get("message", "Failed to link contacts")
+                    }
+
+        except Exception as e:
+            logger.error(f"Error linking contacts to campaign: {str(e)}")
+            return {"status": "error", "message": str(e)}
