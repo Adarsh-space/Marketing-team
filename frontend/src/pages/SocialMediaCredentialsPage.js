@@ -1,378 +1,426 @@
-import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, Facebook, Instagram, Unlink, RefreshCw } from "lucide-react";
+import {
+  Link2,
+  Unlink,
+  RefreshCw,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { api, DEFAULT_USER_ID, handleApiError } from "@/lib/api";
+import { SOCIAL_PLATFORMS, getPlatformLabel } from "@/constants/socialPlatforms";
 
-const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000/api';
+const parseDateValue = (value) => {
+  if (!value) {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const computeExpiryInfo = (account) => {
+  const now = Date.now();
+  const expiryIso = account.token_expires_at || account.expires_at;
+  const ttlSeconds =
+    typeof account.time_until_expiry_seconds === "number"
+      ? account.time_until_expiry_seconds
+      : null;
+
+  let expiresAt = null;
+  if (expiryIso) {
+    expiresAt = parseDateValue(expiryIso);
+  } else if (ttlSeconds !== null) {
+    expiresAt = new Date(now + ttlSeconds * 1000);
+  }
+
+  if (!expiresAt) {
+    return {
+      expiresAt: null,
+      isExpired: Boolean(account.is_expired),
+      isExpiringSoon: Boolean(account.is_expiring_soon),
+    };
+  }
+
+  const diffMs = expiresAt.getTime() - now;
+  const isExpired = account.is_expired ?? diffMs <= 0;
+  const isExpiringSoon = account.is_expiring_soon ?? diffMs < 72 * 3600 * 1000;
+
+  return {
+    expiresAt,
+    isExpired,
+    isExpiringSoon,
+  };
+};
+
+const groupAccountsByPlatform = (accounts) => {
+  return SOCIAL_PLATFORMS.reduce(
+    (acc, platform) => ({
+      ...acc,
+      [platform.id]: accounts.filter((account) => account.platform === platform.id),
+    }),
+    {}
+  );
+};
 
 const SocialMediaCredentialsPage = () => {
-  const [facebookConnected, setFacebookConnected] = useState(false);
-  const [instagramConnected, setInstagramConnected] = useState(false);
-  const [facebookPages, setFacebookPages] = useState([]);
-  const [instagramAccounts, setInstagramAccounts] = useState([]);
-  const [selectedPage, setSelectedPage] = useState('');
-  const [selectedInstagram, setSelectedInstagram] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [accounts, setAccounts] = useState([]);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [connectingPlatform, setConnectingPlatform] = useState(null);
+  const [disconnectingAccount, setDisconnectingAccount] = useState(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
+
+  const accountsByPlatform = useMemo(
+    () => groupAccountsByPlatform(accounts),
+    [accounts]
+  );
+
+  const refreshAccounts = useCallback(
+    async ({ silent = false } = {}) => {
+      setIsRefreshing(true);
+      try {
+        const data = await api.get("/social/accounts", {
+          params: { user_id: DEFAULT_USER_ID },
+        });
+
+        setAccounts(Array.isArray(data?.accounts) ? data.accounts : []);
+        setLastRefreshedAt(new Date());
+        if (!silent) {
+          toast.success("Connection status refreshed");
+        }
+      } catch (error) {
+        toast.error(handleApiError(error, "Failed to load connected accounts"));
+      } finally {
+        setIsRefreshing(false);
+        setPageLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    checkConnectionStatus();
-
-    // Check for OAuth callback params
     const params = new URLSearchParams(window.location.search);
-    if (params.get('facebook') === 'connected') {
-      toast.success('Successfully connected to Facebook!');
-      setFacebookConnected(true);
-      loadFacebookPages();
-      loadInstagramAccounts();
-    } else if (params.get('facebook') === 'error') {
-      toast.error('Failed to connect to Facebook. Please try again.');
-    }
-  }, []);
+    const status = params.get("status");
+    const platform = params.get("platform");
+    const message = params.get("message");
+    const state = params.get("state");
 
-  const checkConnectionStatus = async () => {
-    // Check if credentials exist by trying to load pages/accounts
-    await loadFacebookPages();
-    await loadInstagramAccounts();
-  };
-
-  const loadFacebookPages = async () => {
-    try {
-      const response = await fetch(`${API_URL}/social-media/facebook/pages?user_id=default_user`);
-      const data = await response.json();
-
-      if (data.status === 'success' && data.pages && data.pages.length > 0) {
-        setFacebookPages(data.pages);
-        setFacebookConnected(true);
-        if (data.pages.length > 0) {
-          setSelectedPage(data.pages[0].id);
+    if (platform) {
+      const stateKey = `social_oauth_state_${platform}`;
+      const cachedState = localStorage.getItem(stateKey);
+      if (cachedState) {
+        if (state && cachedState !== state) {
+          toast.warning(
+            "State mismatch detected. If this was unexpected, try reconnecting the account."
+          );
         }
-      } else {
-        setFacebookConnected(false);
-        setFacebookPages([]);
+        localStorage.removeItem(stateKey);
       }
-    } catch (error) {
-      console.error('Error loading Facebook pages:', error);
-      setFacebookConnected(false);
     }
-  };
 
-  const loadInstagramAccounts = async () => {
-    try {
-      const response = await fetch(`${API_URL}/social-media/instagram/accounts?user_id=default_user`);
-      const data = await response.json();
-
-      if (data.status === 'success' && data.accounts && data.accounts.length > 0) {
-        setInstagramAccounts(data.accounts);
-        setInstagramConnected(true);
-        if (data.accounts.length > 0) {
-          setSelectedInstagram(data.accounts[0].instagram_account_id);
-        }
-      } else {
-        setInstagramConnected(false);
-        setInstagramAccounts([]);
-      }
-    } catch (error) {
-      console.error('Error loading Instagram accounts:', error);
-      setInstagramConnected(false);
+    if (status === "success") {
+      toast.success(`${getPlatformLabel(platform)} connected successfully`);
+    } else if (status === "error") {
+      toast.error(
+        message || `Failed to connect ${getPlatformLabel(platform)} account`
+      );
+    } else if (status === "cancelled") {
+      toast(message || "Connection was cancelled");
     }
-  };
 
-  const handleFacebookConnect = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/social-media/facebook/connect?user_id=default_user`);
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        // Redirect to Facebook OAuth
-        window.location.href = data.authorization_url;
-      } else {
-        toast.error('Failed to initiate Facebook connection');
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Error connecting to Facebook:', error);
-      toast.error('Failed to connect to Facebook');
-      setLoading(false);
+    if (status || platform || message) {
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  };
 
-  const handleDisconnectFacebook = async () => {
+    refreshAccounts({ silent: true });
+  }, [refreshAccounts]);
+
+  const handleConnect = async (platformId) => {
     try {
-      setLoading(true);
-      const response = await fetch(`${API_URL}/social-media/credentials/facebook?user_id=default_user`, {
-        method: 'DELETE'
+      setConnectingPlatform(platformId);
+      const redirectUri = `${window.location.origin}/social-media-credentials`;
+      const data = await api.get(`/social/connect/${platformId}`, {
+        params: {
+          user_id: DEFAULT_USER_ID,
+          redirect_uri: redirectUri,
+        },
       });
 
-      const data = await response.json();
-
-      if (data.status === 'success') {
-        setFacebookConnected(false);
-        setFacebookPages([]);
-        setInstagramConnected(false);
-        setInstagramAccounts([]);
-        toast.success('Disconnected from Facebook and Instagram');
-      } else {
-        toast.error('Failed to disconnect');
+      if (!data?.auth_url) {
+        throw new Error("Authorization URL not provided by the server");
       }
+
+      if (data.state) {
+        localStorage.setItem(`social_oauth_state_${platformId}`, data.state);
+      }
+
+      window.location.href = data.auth_url;
     } catch (error) {
-      console.error('Error disconnecting:', error);
-      toast.error('Failed to disconnect');
+      toast.error(
+        handleApiError(
+          error,
+          `Unable to start ${getPlatformLabel(platformId)} connection`
+        )
+      );
     } finally {
-      setLoading(false);
+      setConnectingPlatform(null);
     }
   };
 
-  const handleRefresh = async () => {
-    setLoading(true);
-    await checkConnectionStatus();
-    setLoading(false);
-    toast.success('Connection status refreshed');
+  const handleDisconnect = async (accountId, platformId) => {
+    try {
+      setDisconnectingAccount(accountId);
+      await api.delete(`/social/accounts/${accountId}`, {
+        params: { user_id: DEFAULT_USER_ID },
+      });
+      toast.success(`${getPlatformLabel(platformId)} account disconnected`);
+      refreshAccounts({ silent: true });
+    } catch (error) {
+      toast.error(
+        handleApiError(
+          error,
+          `Failed to disconnect ${getPlatformLabel(platformId)} account`
+        )
+      );
+    } finally {
+      setDisconnectingAccount(null);
+    }
   };
 
+  if (pageLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-6 py-4 shadow-sm">
+          <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+          <span className="text-sm font-medium text-slate-600">
+            Loading social connections...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Social Media Connections</h1>
-        <p className="text-gray-600 mb-6">
-          Connect your social media accounts to enable direct posting
-        </p>
-
-        {/* Facebook Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Facebook className="h-5 w-5 text-blue-600" />
-                Facebook
-              </span>
-              {facebookConnected ? (
-                <Badge variant="success" className="flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <XCircle className="h-4 w-4" />
-                  Not Connected
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Post to your Facebook pages automatically
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {facebookConnected ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Select Facebook Page
-                  </label>
-                  <Select value={selectedPage} onValueChange={setSelectedPage}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a page" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {facebookPages.map((page) => (
-                        <SelectItem key={page.id} value={page.id}>
-                          {page.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Posts will be published to this page
-                  </p>
-                </div>
-
-                <Alert>
-                  <AlertDescription>
-                    <strong>{facebookPages.length}</strong> page(s) available for posting
-                  </AlertDescription>
-                </Alert>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={handleDisconnectFacebook}
-                    variant="destructive"
-                    disabled={loading}
-                  >
-                    <Unlink className="mr-2 h-4 w-4" />
-                    Disconnect
-                  </Button>
-                  <Button
-                    onClick={handleRefresh}
-                    variant="outline"
-                    disabled={loading}
-                  >
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Refresh
-                  </Button>
-                </div>
-              </div>
+    <div className="container mx-auto px-4 py-10">
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">
+            Social Account Connections
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600">
+            Connect Facebook, Instagram, Twitter, and LinkedIn to unlock unified
+            posting, scheduling, analytics, and automated token refresh.
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-2 md:items-end">
+          {lastRefreshedAt && (
+            <span className="text-xs uppercase tracking-wide text-slate-500">
+              Last synced{" "}
+              {formatDistanceToNow(lastRefreshedAt, { addSuffix: true })}
+            </span>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => refreshAccounts()}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Syncing...
+              </>
             ) : (
-              <div className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    Connect your Facebook account to:
-                    <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>Post directly to your Facebook pages</li>
-                      <li>Share images and links automatically</li>
-                      <li>Schedule posts for later</li>
-                      <li>AI-generated content posting</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-
-                <Button
-                  onClick={handleFacebookConnect}
-                  disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Facebook className="mr-2 h-4 w-4" />
-                  {loading ? 'Connecting...' : 'Connect Facebook'}
-                </Button>
-              </div>
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh Status
+              </>
             )}
-          </CardContent>
-        </Card>
+          </Button>
+        </div>
+      </div>
 
-        {/* Instagram Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <Instagram className="h-5 w-5 text-pink-600" />
-                Instagram
-              </span>
-              {instagramConnected ? (
-                <Badge variant="success" className="flex items-center gap-1">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Connected
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="flex items-center gap-1">
-                  <XCircle className="h-4 w-4" />
-                  Not Connected
-                </Badge>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Post to your Instagram Business accounts
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {instagramConnected ? (
-              <div className="space-y-4">
+      <Alert className="mb-8 border-slate-200 bg-slate-50 text-slate-700">
+        <AlertDescription className="flex items-start gap-3">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 text-emerald-500" />
+          <span className="text-sm leading-6">
+            Tokens refresh automatically every six hours. Daily analytics sync
+            runs at 2 AM and weekly cleanup executes on Sundays at 3 AM.
+          </span>
+        </AlertDescription>
+      </Alert>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {SOCIAL_PLATFORMS.map((platform) => {
+          const Icon = platform.icon;
+          const platformAccounts = accountsByPlatform[platform.id] || [];
+
+          return (
+            <Card key={platform.id} className="border-slate-200 shadow-sm">
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Select Instagram Account
-                  </label>
-                  <Select value={selectedInstagram} onValueChange={setSelectedInstagram}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {instagramAccounts.map((account) => (
-                        <SelectItem key={account.instagram_account_id} value={account.instagram_account_id}>
-                          {account.page_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Posts will be published to this Instagram account
-                  </p>
+                  <CardTitle className="flex items-center gap-2 text-xl">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    {platform.label}
+                  </CardTitle>
+                  <CardDescription>{platform.description}</CardDescription>
                 </div>
+                <Badge
+                  variant="outline"
+                  className={`whitespace-nowrap ${platform.badgeClass}`}
+                >
+                  {platformAccounts.length > 0
+                    ? `${platformAccounts.length} connected`
+                    : "Not connected"}
+                </Badge>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {platformAccounts.length > 0 ? (
+                  <div className="space-y-3">
+                    {platformAccounts.map((account) => {
+                      const connectedAt =
+                        parseDateValue(account.connected_at) ||
+                        parseDateValue(account.connectedAt);
+                      const expiryInfo = computeExpiryInfo(account);
 
-                <Alert>
-                  <AlertDescription>
-                    <strong>{instagramAccounts.length}</strong> Business account(s) available for posting
-                  </AlertDescription>
-                </Alert>
-
-                <Alert variant="warning">
-                  <AlertDescription>
-                    Note: Instagram posting requires a Business or Creator account linked to a Facebook page.
-                    Images must be publicly accessible URLs.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <Alert>
-                  <AlertDescription>
-                    Instagram posting requires:
-                    <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>Instagram Business or Creator account</li>
-                      <li>Account linked to a Facebook page</li>
-                      <li>Facebook connection (connect Facebook first)</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
-
-                {!facebookConnected && (
-                  <Alert variant="info">
-                    <AlertDescription>
-                      <strong>Connect Facebook first</strong> to enable Instagram posting.
+                      return (
+                        <div
+                          key={account.account_id}
+                          className="flex flex-col gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-900">
+                                {account.account_name || account.display_name || account.account_id}
+                              </span>
+                              {expiryInfo.isExpired ? (
+                                <Badge variant="destructive">
+                                  Token expired
+                                </Badge>
+                              ) : expiryInfo.isExpiringSoon ? (
+                                <Badge className="border-amber-200 bg-amber-50 text-amber-700">
+                                  Expiring soon
+                                </Badge>
+                              ) : (
+                                <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                                  Active
+                                </Badge>
+                              )}
+                            </div>
+                            {connectedAt && (
+                              <p className="flex items-center gap-2 text-xs text-slate-500">
+                                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                Connected{" "}
+                                {formatDistanceToNow(connectedAt, {
+                                  addSuffix: true,
+                                })}
+                              </p>
+                            )}
+                            {expiryInfo.expiresAt ? (
+                              <p className="flex items-center gap-2 text-xs text-slate-500">
+                                <Clock className="h-4 w-4 text-slate-400" />
+                                {expiryInfo.isExpired
+                                  ? `Token expired ${formatDistanceToNow(
+                                      expiryInfo.expiresAt,
+                                      { addSuffix: true }
+                                    )}`
+                                  : `Expires ${formatDistanceToNow(
+                                      expiryInfo.expiresAt,
+                                      { addSuffix: true }
+                                    )} (${format(
+                                      expiryInfo.expiresAt,
+                                      "PPpp"
+                                    )})`}
+                              </p>
+                            ) : (
+                              <p className="flex items-center gap-2 text-xs text-slate-500">
+                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                Token expiry data unavailable
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleDisconnect(account.account_id, platform.id)
+                              }
+                              disabled={disconnectingAccount === account.account_id}
+                            >
+                              {disconnectingAccount === account.account_id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Removing...
+                                </>
+                              ) : (
+                                <>
+                                  <Unlink className="mr-2 h-4 w-4" />
+                                  Disconnect
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <Alert className="border-dashed border-slate-200 bg-white text-slate-600">
+                    <AlertDescription className="text-sm leading-6">
+                      No {platform.label} accounts connected yet. Click{" "}
+                      <strong>Connect</strong> to start the OAuth flow, approve
+                      access, and return here to manage the connection.
                     </AlertDescription>
                   </Alert>
                 )}
 
-                <Button
-                  onClick={handleFacebookConnect}
-                  disabled={loading || facebookConnected}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                >
-                  <Instagram className="mr-2 h-4 w-4" />
-                  {facebookConnected ? 'Instagram Connected via Facebook' : 'Connect Instagram (via Facebook)'}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Info Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Important Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4 text-sm">
-              <div>
-                <h4 className="font-semibold mb-1">Facebook Posting</h4>
-                <ul className="list-disc list-inside text-gray-600 space-y-1">
-                  <li>Can only post to pages (not personal timeline)</li>
-                  <li>Requires page admin access</li>
-                  <li>Supports text, images, and links</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-1">Instagram Posting</h4>
-                <ul className="list-disc list-inside text-gray-600 space-y-1">
-                  <li>Requires Business or Creator account</li>
-                  <li>Must be linked to a Facebook page</li>
-                  <li>Images must be publicly accessible URLs</li>
-                  <li>Cannot post stories via API</li>
-                </ul>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-1">Security</h4>
-                <p className="text-gray-600">
-                  Your credentials are encrypted and stored securely in Zoho CRM.
-                  You can disconnect at any time.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <Button
+                    onClick={() => handleConnect(platform.id)}
+                    disabled={connectingPlatform === platform.id}
+                    className="w-full sm:w-auto"
+                  >
+                    {connectingPlatform === platform.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Redirecting...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="mr-2 h-4 w-4" />
+                        Connect {platform.label}
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => refreshAccounts({ silent: true })}
+                    disabled={isRefreshing}
+                    className="w-full sm:w-auto"
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Sync Accounts
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
