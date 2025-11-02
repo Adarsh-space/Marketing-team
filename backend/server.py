@@ -1321,40 +1321,11 @@ async def zoho_callback(code: str = None, state: str = None, error: str = None):
         else:
             return RedirectResponse(
                 url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
-                        <p>Redirecting to settings...</p>
-                        <script>
-                            setTimeout(function() {{
-                                window.location.href = "{frontend_url}/settings?zoho=error&error={error_type}";
-                            }}, 2000);
-                        </script>
-                    </body>
-                </html>
-                """,
-                status_code=200
             )
-
     except Exception as e:
-        logger.error(f"Zoho OAuth callback error: {str(e)}")
+        logger.error(f"Zoho OAuth callback error: {str(e)}", exc_info=True)
         return RedirectResponse(
             url=f"{os.environ.get('REACT_APP_FRONTEND_URL', 'http://localhost:3000')}/zoho-connections?zoho=error"
-        logger.error(f"Zoho OAuth callback error: {str(e)}", exc_info=True)
-        return HTMLResponse(
-            content=f"""
-            <html>
-                <head><title>Zoho Connection Error</title></head>
-                <body style="font-family: Arial; padding: 50px; text-align: center;">
-                    <h2 style="color: #dc3545;">❌ Zoho Connection Error</h2>
-                    <p>An unexpected error occurred: {str(e)}</p>
-                    <p>Redirecting to settings...</p>
-                    <script>
-                        setTimeout(function() {{
-                            window.location.href = "{frontend_url}/settings?zoho=error&error=unexpected";
-                        }}, 2000);
-                    </script>
-                </body>
-            </html>
-            """,
-            status_code=500
         )
 
 @api_router.get("/zoho/status")
