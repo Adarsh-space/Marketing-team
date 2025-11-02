@@ -210,7 +210,7 @@ class ApprovalWorkflowManager:
         request.approve(notes)
 
         # Update in database
-        if self.db:
+        if self.db is not None:
             await self.db.approval_requests.update_one(
                 {"request_id": request_id},
                 {"$set": request.to_dict()}
@@ -263,7 +263,7 @@ class ApprovalWorkflowManager:
         request.reject(notes)
 
         # Update in database
-        if self.db:
+        if self.db is not None:
             await self.db.approval_requests.update_one(
                 {"request_id": request_id},
                 {"$set": request.to_dict()}
