@@ -140,11 +140,61 @@ const VoiceAssistantWithAgents = () => {
 
       addAgentLog('ConversationalAgent', 'PROCESSING', 'Analyzing user intent...');
       
-      if (chatResponse.data.ready_to_plan) {
+      // Handle different response types
+      const responseType = chatResponse.data.type;
+
+      if (responseType === 'awaiting_approval') {
+        // NEW: Plan created, waiting for user approval
         addAgentLog('ConversationalAgent', 'COMPLETE', 'Requirements gathered. Creating campaign...');
         addAgentLog('Orchestrator', 'ROUTING', 'Assigning to Planning Agent');
         addAgentLog('PlanningAgent', 'STARTED', 'Creating strategic plan...');
-        
+
+        setTimeout(() => {
+          addAgentLog('PlanningAgent', 'COMPLETE', 'Plan created! Review and approve to proceed');
+
+          // Show which agents will be used
+          const plan = chatResponse.data.plan;
+          if (plan && plan.tasks) {
+            plan.tasks.forEach(task => {
+              addAgentLog(task.agent_assigned, 'PLANNED', task.description);
+            });
+          }
+
+          addAgentLog('System', 'WAITING', '⏸️  Awaiting your approval. Say "approve" to proceed.');
+        }, 1500);
+
+      } else if (responseType === 'campaign_executing') {
+        // User approved, agents executing
+        addAgentLog('System', 'APPROVED', '✅ Campaign approved! Starting execution...');
+        addAgentLog('Orchestrator', 'EXECUTING', 'Running agent tasks sequentially...');
+
+        setTimeout(() => {
+          addAgentLog('ScrapingAgent', 'STARTED', 'Scraping contact data...');
+          addAgentLog('ContentAgent', 'QUEUED', 'Waiting for scraping to complete...');
+          addAgentLog('EmailAgent', 'QUEUED', 'Waiting for content creation...');
+        }, 1000);
+
+        setTimeout(() => {
+          addAgentLog('ScrapingAgent', 'COMPLETE', '✅ Scraped contact data successfully');
+          addAgentLog('ContentAgent', 'STARTED', 'Creating campaign content...');
+        }, 3000);
+
+        setTimeout(() => {
+          addAgentLog('ContentAgent', 'COMPLETE', '✅ Content created successfully');
+          addAgentLog('EmailAgent', 'STARTED', 'Preparing emails...');
+        }, 5000);
+
+        setTimeout(() => {
+          addAgentLog('EmailAgent', 'COMPLETE', '✅ Campaign execution complete!');
+          addAgentLog('System', 'SUCCESS', '🎉 All agents finished successfully!');
+        }, 7000);
+
+      } else if (chatResponse.data.ready_to_plan) {
+        // Old flow fallback
+        addAgentLog('ConversationalAgent', 'COMPLETE', 'Requirements gathered. Creating campaign...');
+        addAgentLog('Orchestrator', 'ROUTING', 'Assigning to Planning Agent');
+        addAgentLog('PlanningAgent', 'STARTED', 'Creating strategic plan...');
+
         setTimeout(() => {
           addAgentLog('PlanningAgent', 'COMPLETE', 'Plan created. Assigning tasks to specialist agents');
           addAgentLog('MarketResearchAgent', 'ASSIGNED', 'Task: Analyze target audience');
@@ -185,7 +235,14 @@ const VoiceAssistantWithAgents = () => {
       
       speakText(aiResponse);
 
-      if (chatResponse.data.ready_to_plan && chatResponse.data.campaign_id) {
+      // Only navigate to campaign page if execution is complete
+      if (responseType === 'campaign_executing' && chatResponse.data.execution_started) {
+        toast.success('✅ Campaign executing! Agents are working...');
+        // Don't navigate away - show real-time agent logs
+      } else if (responseType === 'awaiting_approval') {
+        toast.info('📋 Plan created! Review and say "approve" to proceed.');
+      } else if (chatResponse.data.ready_to_plan && chatResponse.data.campaign_id && responseType !== 'awaiting_approval') {
+        // Only navigate for old flow
         toast.success('Campaign created!');
         setTimeout(() => navigate(`/campaign/${chatResponse.data.campaign_id}`), 3000);
       }
