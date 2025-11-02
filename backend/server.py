@@ -1324,28 +1324,6 @@ async def zoho_callback(code: str = None, state: str = None, error: str = None):
                         <p>Redirecting to settings...</p>
                         <script>
                             setTimeout(function() {{
-                                window.location.href = "{frontend_url}/settings?zoho=connected";
-                            }}, 1500);
-                        </script>
-                    </body>
-                </html>
-                """,
-                status_code=200
-            )
-        else:
-            error_message = result.get("message", "Unknown error")
-            error_type = result.get("error", "token_exchange_failed")
-            logger.error(f"Zoho token exchange failed: {error_message}")
-            return HTMLResponse(
-                content=f"""
-                <html>
-                    <head><title>Zoho Connection Failed</title></head>
-                    <body style="font-family: Arial; padding: 50px; text-align: center;">
-                        <h2 style="color: #dc3545;">❌ Zoho Connection Failed</h2>
-                        <p>Error: {error_message}</p>
-                        <p>Redirecting to settings...</p>
-                        <script>
-                            setTimeout(function() {{
                                 window.location.href = "{frontend_url}/settings?zoho=error&error={error_type}";
                             }}, 2000);
                         </script>
