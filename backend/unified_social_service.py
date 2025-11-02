@@ -77,6 +77,31 @@ class UnifiedSocialService:
             import secrets
             state = secrets.token_urlsafe(32)
 
+            # Check if credentials are configured for this platform
+            platform_config = self.platforms.get(platform)
+            if not platform_config:
+                raise ValueError(f"Unsupported platform: {platform}")
+
+            # Validate credentials
+            if platform == "facebook" or platform == "instagram":
+                if not platform_config.get("app_id") or not platform_config.get("app_secret"):
+                    raise ValueError(
+                        f"{platform.capitalize()} credentials not configured. "
+                        f"Please set FACEBOOK_APP_ID and FACEBOOK_APP_SECRET in .env file"
+                    )
+            elif platform == "twitter":
+                if not platform_config.get("api_key") or not platform_config.get("api_secret"):
+                    raise ValueError(
+                        "Twitter credentials not configured. "
+                        "Please set TWITTER_API_KEY and TWITTER_API_SECRET in .env file"
+                    )
+            elif platform == "linkedin":
+                if not platform_config.get("client_id") or not platform_config.get("client_secret"):
+                    raise ValueError(
+                        "LinkedIn credentials not configured. "
+                        "Please set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET in .env file"
+                    )
+
             # Store state for verification
             await self.db.oauth_states.insert_one({
                 "state": state,
@@ -129,6 +154,7 @@ class UnifiedSocialService:
             else:
                 raise ValueError(f"Unsupported platform: {platform}")
 
+            logger.info(f"Generated OAuth URL for {platform} successfully")
             return {
                 "status": "success",
                 "authorization_url": auth_url,
@@ -140,7 +166,8 @@ class UnifiedSocialService:
             logger.error(f"Error generating auth URL for {platform}: {str(e)}")
             return {
                 "status": "error",
-                "error": str(e)
+                "error": str(e),
+                "message": f"Failed to get {platform} authorization URL: {str(e)}"
             }
 
     async def handle_oauth_callback(

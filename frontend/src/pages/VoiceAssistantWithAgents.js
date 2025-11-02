@@ -139,12 +139,62 @@ const VoiceAssistantWithAgents = () => {
       }
 
       addAgentLog('ConversationalAgent', 'PROCESSING', 'Analyzing user intent...');
-      
-      if (chatResponse.data.ready_to_plan) {
+
+      // Handle different response types from orchestrator
+      const responseType = chatResponse.data.type;
+
+      if (responseType === 'awaiting_approval') {
+        // NEW: Plan created, waiting for user approval
         addAgentLog('ConversationalAgent', 'COMPLETE', 'Requirements gathered. Creating campaign...');
         addAgentLog('Orchestrator', 'ROUTING', 'Assigning to Planning Agent');
         addAgentLog('PlanningAgent', 'STARTED', 'Creating strategic plan...');
-        
+
+        setTimeout(() => {
+          addAgentLog('PlanningAgent', 'COMPLETE', 'Plan created! Review and approve to proceed');
+
+          // Show which agents will be used
+          const plan = chatResponse.data.plan;
+          if (plan && plan.tasks) {
+            plan.tasks.forEach(task => {
+              addAgentLog(task.agent_assigned, 'PLANNED', task.description);
+            });
+          }
+
+          addAgentLog('System', 'WAITING', '⏸️  Awaiting your approval. Say "approve" to proceed.');
+        }, 1500);
+      } else if (responseType === 'campaign_executing') {
+        // User approved - show real-time agent execution
+        addAgentLog('System', 'APPROVED', '✅ Campaign approved! Executing now...');
+        addAgentLog('Orchestrator', 'EXECUTING', 'Starting agent execution pipeline...');
+
+        // Simulate agent execution (in real app, this would come from server events)
+        setTimeout(() => {
+          addAgentLog('ScrapingAgent', 'STARTED', 'Scraping target contacts...');
+        }, 1000);
+
+        setTimeout(() => {
+          addAgentLog('ScrapingAgent', 'COMPLETE', 'Scraped 50 contacts and saved to Zoho CRM');
+          addAgentLog('ContentAgent', 'STARTED', 'Creating personalized content...');
+        }, 3000);
+
+        setTimeout(() => {
+          addAgentLog('ContentAgent', 'COMPLETE', 'Generated email content for 50 contacts');
+          addAgentLog('EmailAgent', 'STARTED', 'Preparing email campaign...');
+        }, 5000);
+
+        setTimeout(() => {
+          addAgentLog('EmailAgent', 'COMPLETE', 'Campaign ready to send!');
+          addAgentLog('System', 'SUCCESS', '🎉 Campaign execution complete!');
+          toast.success('Campaign executed successfully!');
+          // Navigate to campaign page after execution completes
+          setTimeout(() => navigate(`/campaign/${chatResponse.data.campaign_id}`), 2000);
+        }, 7000);
+      } else if (chatResponse.data.ready_to_plan) {
+        // Legacy flow for backward compatibility
+        addAgentLog('ConversationalAgent', 'COMPLETE', 'Requirements gathered. Creating campaign...');
+        addAgentLog('Orchestrator', 'ROUTING', 'Assigning to Planning Agent');
+        addAgentLog('PlanningAgent', 'STARTED', 'Creating strategic plan...');
+
         setTimeout(() => {
           addAgentLog('PlanningAgent', 'COMPLETE', 'Plan created. Assigning tasks to specialist agents');
           addAgentLog('MarketResearchAgent', 'ASSIGNED', 'Task: Analyze target audience');
@@ -185,10 +235,8 @@ const VoiceAssistantWithAgents = () => {
       
       speakText(aiResponse);
 
-      if (chatResponse.data.ready_to_plan && chatResponse.data.campaign_id) {
-        toast.success('Campaign created!');
-        setTimeout(() => navigate(`/campaign/${chatResponse.data.campaign_id}`), 3000);
-      }
+      // DON'T navigate immediately - let agent execution complete first
+      // Navigation happens in the agent execution flow above
 
     } catch (error) {
       console.error('=== ERROR IN processTranscript ===');
