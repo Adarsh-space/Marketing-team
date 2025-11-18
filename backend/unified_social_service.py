@@ -21,8 +21,9 @@ class UnifiedSocialService:
     Handles OAuth, posting, analytics, and account management.
     """
 
-    def __init__(self, db):
+    def __init__(self, db, zoho_crm_service=None):
         self.db = db
+        self.zoho_crm_service = zoho_crm_service
 
         # Platform configurations
         self.platforms = {
@@ -293,6 +294,48 @@ class UnifiedSocialService:
                         upsert=True
                     )
 
+                    # Also save to Zoho CRM for centralized credential management
+                    if self.zoho_crm_service:
+                        try:
+                            zoho_credential_record = {
+                                "Name": f"{user_id}_facebook_{page['id']}",
+                                "User_ID": user_id,
+                                "Platform": "Facebook",
+                                "Account_ID": account_id,
+                                "Account_Name": page.get("name"),
+                                "Auth_Type": "oauth",
+                                "Status": "active",
+                                "Connected_At": datetime.now(timezone.utc).isoformat(),
+                                "Last_Updated": datetime.now(timezone.utc).isoformat()
+                            }
+
+                            # Check if already exists
+                            existing = await self.zoho_crm_service.search_records(
+                                module_name="Social_Media_Credentials",
+                                search_criteria=f"Account_ID = '{account_id}'",
+                                user_id=user_id
+                            )
+
+                            if existing.get("status") == "success" and existing.get("records"):
+                                # Update existing
+                                record_id = existing["records"][0]["id"]
+                                await self.zoho_crm_service.update_record(
+                                    module_name="Social_Media_Credentials",
+                                    record_id=record_id,
+                                    updates=zoho_credential_record,
+                                    user_id=user_id
+                                )
+                            else:
+                                # Create new
+                                await self.zoho_crm_service.create_record(
+                                    module_name="Social_Media_Credentials",
+                                    record_data=zoho_credential_record,
+                                    user_id=user_id
+                                )
+                            logger.info(f"Saved Facebook credentials to Zoho CRM: {account_id}")
+                        except Exception as e:
+                            logger.warning(f"Failed to save to Zoho CRM (continuing anyway): {str(e)}")
+
                     accounts_created.append({
                         "account_id": account_id,
                         "name": page.get("name"),
@@ -401,6 +444,48 @@ class UnifiedSocialService:
                             upsert=True
                         )
 
+                        # Also save to Zoho CRM for centralized credential management
+                        if self.zoho_crm_service:
+                            try:
+                                zoho_credential_record = {
+                                    "Name": f"{user_id}_instagram_{ig_account_id}",
+                                    "User_ID": user_id,
+                                    "Platform": "Instagram",
+                                    "Account_ID": account_id,
+                                    "Account_Name": ig_info.get("username"),
+                                    "Auth_Type": "oauth",
+                                    "Status": "active",
+                                    "Connected_At": datetime.now(timezone.utc).isoformat(),
+                                    "Last_Updated": datetime.now(timezone.utc).isoformat()
+                                }
+
+                                # Check if already exists
+                                existing = await self.zoho_crm_service.search_records(
+                                    module_name="Social_Media_Credentials",
+                                    search_criteria=f"Account_ID = '{account_id}'",
+                                    user_id=user_id
+                                )
+
+                                if existing.get("status") == "success" and existing.get("records"):
+                                    # Update existing
+                                    record_id = existing["records"][0]["id"]
+                                    await self.zoho_crm_service.update_record(
+                                        module_name="Social_Media_Credentials",
+                                        record_id=record_id,
+                                        updates=zoho_credential_record,
+                                        user_id=user_id
+                                    )
+                                else:
+                                    # Create new
+                                    await self.zoho_crm_service.create_record(
+                                        module_name="Social_Media_Credentials",
+                                        record_data=zoho_credential_record,
+                                        user_id=user_id
+                                    )
+                                logger.info(f"Saved Instagram credentials to Zoho CRM: {account_id}")
+                            except Exception as e:
+                                logger.warning(f"Failed to save to Zoho CRM (continuing anyway): {str(e)}")
+
                         accounts_created.append({
                             "account_id": account_id,
                             "name": ig_info.get("username"),
@@ -492,6 +577,48 @@ class UnifiedSocialService:
                     upsert=True
                 )
 
+                # Also save to Zoho CRM for centralized credential management
+                if self.zoho_crm_service:
+                    try:
+                        zoho_credential_record = {
+                            "Name": f"{user_id}_twitter_{user_data['id']}",
+                            "User_ID": user_id,
+                            "Platform": "Twitter",
+                            "Account_ID": account_id,
+                            "Account_Name": user_data.get("username"),
+                            "Auth_Type": "oauth",
+                            "Status": "active",
+                            "Connected_At": datetime.now(timezone.utc).isoformat(),
+                            "Last_Updated": datetime.now(timezone.utc).isoformat()
+                        }
+
+                        # Check if already exists
+                        existing = await self.zoho_crm_service.search_records(
+                            module_name="Social_Media_Credentials",
+                            search_criteria=f"Account_ID = '{account_id}'",
+                            user_id=user_id
+                        )
+
+                        if existing.get("status") == "success" and existing.get("records"):
+                            # Update existing
+                            record_id = existing["records"][0]["id"]
+                            await self.zoho_crm_service.update_record(
+                                module_name="Social_Media_Credentials",
+                                record_id=record_id,
+                                updates=zoho_credential_record,
+                                user_id=user_id
+                            )
+                        else:
+                            # Create new
+                            await self.zoho_crm_service.create_record(
+                                module_name="Social_Media_Credentials",
+                                record_data=zoho_credential_record,
+                                user_id=user_id
+                            )
+                        logger.info(f"Saved Twitter credentials to Zoho CRM: {account_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to save to Zoho CRM (continuing anyway): {str(e)}")
+
                 return {
                     "status": "success",
                     "platform": "twitter",
@@ -564,6 +691,48 @@ class UnifiedSocialService:
                     {"$set": account_doc},
                     upsert=True
                 )
+
+                # Also save to Zoho CRM for centralized credential management
+                if self.zoho_crm_service:
+                    try:
+                        zoho_credential_record = {
+                            "Name": f"{user_id}_linkedin_{user_data['id']}",
+                            "User_ID": user_id,
+                            "Platform": "LinkedIn",
+                            "Account_ID": account_id,
+                            "Account_Name": account_doc["account_name"],
+                            "Auth_Type": "oauth",
+                            "Status": "active",
+                            "Connected_At": datetime.now(timezone.utc).isoformat(),
+                            "Last_Updated": datetime.now(timezone.utc).isoformat()
+                        }
+
+                        # Check if already exists
+                        existing = await self.zoho_crm_service.search_records(
+                            module_name="Social_Media_Credentials",
+                            search_criteria=f"Account_ID = '{account_id}'",
+                            user_id=user_id
+                        )
+
+                        if existing.get("status") == "success" and existing.get("records"):
+                            # Update existing
+                            record_id = existing["records"][0]["id"]
+                            await self.zoho_crm_service.update_record(
+                                module_name="Social_Media_Credentials",
+                                record_id=record_id,
+                                updates=zoho_credential_record,
+                                user_id=user_id
+                            )
+                        else:
+                            # Create new
+                            await self.zoho_crm_service.create_record(
+                                module_name="Social_Media_Credentials",
+                                record_data=zoho_credential_record,
+                                user_id=user_id
+                            )
+                        logger.info(f"Saved LinkedIn credentials to Zoho CRM: {account_id}")
+                    except Exception as e:
+                        logger.warning(f"Failed to save to Zoho CRM (continuing anyway): {str(e)}")
 
                 return {
                     "status": "success",

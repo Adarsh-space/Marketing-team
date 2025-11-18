@@ -29,9 +29,10 @@ class AgentOrchestrator:
     Now integrated with Zoho CRM for data storage!
     """
 
-    def __init__(self, db, zoho_crm_service=None):
+    def __init__(self, db, zoho_crm_service=None, collaboration_system=None):
         self.db = db
         self.zoho_crm_service = zoho_crm_service
+        self.collaboration_system = collaboration_system
         self.agents = {
             "ConversationalAgent": ConversationalAgent(),
             "PlanningAgent": PlanningAgent(),
@@ -144,14 +145,51 @@ class AgentOrchestrator:
                 "content": user_message,
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
-            
+
+            # Log user message to collaboration system
+            if self.collaboration_system:
+                await self.collaboration_system.publish_event(
+                    agent_name="User",
+                    event_type="user_message",
+                    data={
+                        "message": user_message[:100],
+                        "to_agent": "ConversationalAgent"
+                    },
+                    conversation_id=conversation_id
+                )
+
             # Process with Conversational Agent
             cia = self.agents["ConversationalAgent"]
+
+            # Log that agent is starting
+            if self.collaboration_system:
+                await self.collaboration_system.publish_event(
+                    agent_name="ConversationalAgent",
+                    event_type="task_started",
+                    data={
+                        "message": "Processing user request and gathering requirements",
+                        "to_agent": "User"
+                    },
+                    conversation_id=conversation_id
+                )
+
             response = await cia.execute({
                 "user_message": user_message,
                 "conversation_history": conversation.get("messages", []),
                 "vector_context": vector_context  # ADD THIS!
             })
+
+            # Log completion
+            if self.collaboration_system:
+                await self.collaboration_system.publish_event(
+                    agent_name="ConversationalAgent",
+                    event_type="task_completed",
+                    data={
+                        "message": "Completed processing user request",
+                        "to_agent": "User"
+                    },
+                    conversation_id=conversation_id
+                )
             
             # Add assistant response to history
             assistant_msg = {
@@ -315,26 +353,57 @@ Reply 'approve' to proceed or 'reject' to cancel.
         Execute a campaign plan by orchestrating all agent tasks.
         This runs synchronously as per requirements.
         """
+        # Initialize conversation_id outside try block for error handling
+        conversation_id = None
         try:
             campaign = await self.db.campaigns.find_one({"campaign_id": campaign_id})
             if not campaign:
                 raise ValueError(f"Campaign {campaign_id} not found")
-            
+
+            # Get conversation_id for collaboration events
+            conversation_id = campaign.get("conversation_id")
+
             logger.info(f"Starting campaign execution: {campaign_id}")
-            
+
             # Step 1: Generate plan using Planning Agent
             await self._update_campaign_status(campaign_id, "planning")
+
+            # Publish event: Planning started
+            if self.collaboration_system and conversation_id:
+                await self.collaboration_system.publish_event(
+                    agent_name="PlanningAgent",
+                    event_type="task_started",
+                    data={
+                        "message": "Creating strategic plan for campaign",
+                        "campaign_id": campaign_id
+                    },
+                    conversation_id=conversation_id
+                )
+
             planning_agent = self.agents["PlanningAgent"]
             plan_response = await planning_agent.execute({
                 "campaign_brief": campaign["brief"],
                 "task_id": "planning"
             })
-            
+
             plan = plan_response.get("result", {})
             await self.db.campaigns.update_one(
                 {"campaign_id": campaign_id},
                 {"$set": {"plan": plan, "updated_at": datetime.now(timezone.utc).isoformat()}}
             )
+
+            # Publish event: Planning completed
+            if self.collaboration_system and conversation_id:
+                await self.collaboration_system.publish_event(
+                    agent_name="PlanningAgent",
+                    event_type="task_completed",
+                    data={
+                        "message": f"Created plan with {len(plan.get('tasks', []))} tasks",
+                        "campaign_id": campaign_id,
+                        "task_count": len(plan.get('tasks', []))
+                    },
+                    conversation_id=conversation_id
+                )
             
             # Step 2: Execute tasks in order (respecting dependencies)
             tasks = plan.get("tasks", [])
@@ -343,29 +412,85 @@ Reply 'approve' to proceed or 'reject' to cancel.
             for task in tasks:
                 task_id = task.get("task_id")
                 agent_name = task.get("agent_assigned")
-                
+                task_description = task.get("description", "")
+
                 # Check dependencies
                 dependencies = task.get("dependencies", [])
+                missing_deps = []
                 if dependencies:
                     # Ensure all dependencies are completed
                     for dep in dependencies:
                         if dep not in task_results:
-                            logger.warning(f"Dependency {dep} not completed for {task_id}")
-                
+                            missing_deps.append(dep)
+                            logger.error(f"Dependency {dep} not completed for {task_id}")
+                        elif task_results[dep].get("status") != "success":
+                            missing_deps.append(dep)
+                            logger.error(f"Dependency {dep} failed for {task_id}")
+
+                # Skip task if dependencies are missing or failed
+                if missing_deps:
+                    error_msg = f"Cannot execute {task_id}: missing or failed dependencies: {', '.join(missing_deps)}"
+                    logger.error(error_msg)
+                    if self.collaboration_system and conversation_id:
+                        await self.collaboration_system.publish_event(
+                            agent_name=agent_name,
+                            event_type="task_failed",
+                            data={
+                                "message": error_msg,
+                                "task_id": task_id,
+                                "description": task_description,
+                                "missing_dependencies": missing_deps
+                            },
+                            conversation_id=conversation_id
+                        )
+                    # Store failed result
+                    task_results[task_id] = {
+                        "status": "failed",
+                        "agent": agent_name,
+                        "error": error_msg
+                    }
+                    continue
+
                 # Execute task
                 await self._update_campaign_status(campaign_id, f"executing_{task_id}")
                 agent = self.agents.get(agent_name)
-                
+
                 if not agent:
                     logger.error(f"Agent {agent_name} not found for task {task_id}")
+                    # Publish failure event
+                    if self.collaboration_system and conversation_id:
+                        await self.collaboration_system.publish_event(
+                            agent_name=agent_name,
+                            event_type="task_failed",
+                            data={
+                                "message": f"Agent {agent_name} not found",
+                                "task_id": task_id,
+                                "description": task_description
+                            },
+                            conversation_id=conversation_id
+                        )
                     continue
-                
+
+                # Publish event: Task started
+                if self.collaboration_system and conversation_id:
+                    await self.collaboration_system.publish_event(
+                        agent_name=agent_name,
+                        event_type="task_started",
+                        data={
+                            "message": task_description,
+                            "task_id": task_id,
+                            "description": task_description,
+                            "campaign_id": campaign_id
+                        },
+                        conversation_id=conversation_id
+                    )
+
                 # Prepare task payload with context from previous tasks
                 # Only pass serializable data to avoid circular references
                 task_payload = {
                     "task_id": task_id,
                     "campaign_brief": campaign["brief"],
-                    "task_description": task.get("description", ""),
+                    "task_description": task_description,
                     "task_requirements": task.get("requirements", []),
                     # Zoho CRM integration
                     "campaign_id": campaign.get("zoho_campaign_id", campaign_id),  # Use Zoho campaign ID if available
@@ -395,7 +520,26 @@ Reply 'approve' to proceed or 'reject' to cancel.
 
                 logger.info(f"Executing task: {task_id} with agent: {agent_name} (Zoho CRM: {'enabled' if self.zoho_crm_service else 'disabled'})")
                 result = await agent.execute(task_payload)
-                
+
+                # Publish event: Task completed or failed
+                if self.collaboration_system and conversation_id:
+                    event_type = "task_completed" if result.get("status") == "success" else "task_failed"
+                    result_message = result.get("result", {}) if isinstance(result.get("result"), dict) else {}
+                    summary = result_message.get("summary", str(result.get("result", ""))[:200]) if result.get("status") == "success" else result.get("error", "Task failed")
+
+                    await self.collaboration_system.publish_event(
+                        agent_name=agent_name,
+                        event_type=event_type,
+                        data={
+                            "message": summary,
+                            "task_id": task_id,
+                            "description": task_description,
+                            "status": result.get("status"),
+                            "campaign_id": campaign_id
+                        },
+                        conversation_id=conversation_id
+                    )
+
                 # Store task result
                 task_results[task_id] = result
                 
@@ -422,24 +566,52 @@ Reply 'approve' to proceed or 'reject' to cancel.
                     }
                 }
             )
-            
+
+            # Publish event: Campaign completed
+            if self.collaboration_system and conversation_id:
+                successful_tasks = sum(1 for r in task_results.values() if r.get("status") == "success")
+                total_tasks = len(task_results)
+                await self.collaboration_system.publish_event(
+                    agent_name="Orchestrator",
+                    event_type="task_completed",
+                    data={
+                        "message": f"Campaign completed! {successful_tasks}/{total_tasks} tasks successful",
+                        "campaign_id": campaign_id,
+                        "successful_tasks": successful_tasks,
+                        "total_tasks": total_tasks
+                    },
+                    conversation_id=conversation_id
+                )
+
             logger.info(f"Campaign {campaign_id} execution completed")
-            
+
             # Return clean data without MongoDB ObjectIds
             # Convert any complex objects to serializable format
             clean_plan = self._clean_for_json(plan)
             clean_results = self._clean_for_json(task_results)
-            
+
             return {
                 "campaign_id": campaign_id,
                 "status": "completed",
                 "plan": clean_plan,
                 "results": clean_results
             }
-            
+
         except Exception as e:
             logger.error(f"Error executing campaign: {str(e)}")
             await self._update_campaign_status(campaign_id, "failed")
+            # Publish failure event
+            if self.collaboration_system and conversation_id:
+                await self.collaboration_system.publish_event(
+                    agent_name="Orchestrator",
+                    event_type="task_failed",
+                    data={
+                        "message": f"Campaign execution failed: {str(e)[:200]}",
+                        "campaign_id": campaign_id,
+                        "error": str(e)[:200]
+                    },
+                    conversation_id=conversation_id
+                )
             raise
     
     def _clean_for_json(self, data: Any) -> Any:

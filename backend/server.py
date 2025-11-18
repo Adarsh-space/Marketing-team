@@ -152,12 +152,12 @@ zoho_mail = ZohoMailService(zoho_auth)
 zoho_campaigns = ZohoCampaignsService(zoho_auth)
 
 # Initialize services with Zoho CRM integration
-orchestrator = AgentOrchestrator(db, zoho_crm_service=zoho_crm)
+collaboration_system = AgentCollaborationSystem(db)
+orchestrator = AgentOrchestrator(db, zoho_crm_service=zoho_crm, collaboration_system=collaboration_system)
 integrated_supervisor = IntegratedSupervisor(db)  # New integrated supervisor
 voice_service = VoiceService()
 social_media_service = SocialMediaService()
 vector_memory = VectorMemoryService(db)
-collaboration_system = AgentCollaborationSystem(db)
 zoho_analytics = ZohoAnalyticsService(zoho_auth)
 
 # Initialize social media integration service
@@ -165,7 +165,7 @@ social_media_integration = SocialMediaIntegrationService(zoho_crm, db)
 
 # Initialize new integration services
 oauth_manager = OAuthManager(client)
-unified_social_service = UnifiedSocialService(db)
+unified_social_service = UnifiedSocialService(db, zoho_crm_service=zoho_crm)
 analytics_aggregator = AnalyticsAggregator(client, oauth_manager)
 job_scheduler = JobScheduler(client, oauth_manager, unified_social_service, analytics_aggregator)
 
@@ -1321,12 +1321,28 @@ async def get_voice_approval_prompt(request_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @api_router.get("/agent-communication")
-async def get_agent_communication():
+async def get_agent_communication(limit: int = 50):
     """
-    Get all agent-to-agent communication logs.
+    Get all agent-to-agent communication logs from database.
     """
     try:
-        communication = integrated_supervisor.get_agent_communication()
+        # Fetch recent agent events from database
+        events = await db.agent_events.find(
+            {},
+            {"_id": 0}
+        ).sort("timestamp", -1).limit(limit).to_list(limit)
+
+        # Convert to communication format expected by frontend
+        communication = []
+        for event in reversed(events):  # Reverse to show chronological order
+            communication.append({
+                "timestamp": event.get("timestamp"),
+                "from": event.get("agent_name", "System"),
+                "to": event.get("data", {}).get("to_agent", "User"),
+                "type": event.get("event_type", "message"),
+                "message": event.get("data", {}).get("description") or event.get("data", {}).get("message", str(event.get("data", {})))
+            })
+
         return {
             "status": "success",
             "communication": communication,
@@ -2146,6 +2162,209 @@ async def disconnect_social_account(
         return result
     except Exception as e:
         logger.error(f"Error disconnecting account: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ==================== Mock/Test Endpoints (DEVELOPMENT ONLY) ====================
+
+@api_router.post("/social/connect/mock/{platform}")
+async def mock_connect_social_account(
+    platform: str,
+    user_id: str = Query("default_user"),
+    account_name: str = Query(None)
+):
+    """
+    🔧 DEVELOPMENT/TESTING ONLY: Create a mock social media connection
+
+    This endpoint bypasses OAuth and creates a test account for development.
+    DO NOT use in production!
+
+    Platforms: facebook, instagram, twitter, linkedin
+
+    Usage:
+        POST /api/social/connect/mock/facebook?user_id=test_user&account_name=My%20Test%20Page
+    """
+    try:
+        import uuid
+        from datetime import datetime, timezone
+
+        # Validate platform
+        valid_platforms = ["facebook", "instagram", "twitter", "linkedin"]
+        if platform not in valid_platforms:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid platform. Must be one of: {', '.join(valid_platforms)}"
+            )
+
+        # Generate mock account
+        account_id = f"{platform[:2]}_{uuid.uuid4().hex[:8]}"
+
+        if not account_name:
+            account_name = f"Test {platform.title()} Account"
+
+        mock_account = {
+            "user_id": user_id,
+            "platform": platform,
+            "account_id": account_id,
+            "account_name": account_name,
+            "account_username": f"test_{platform}_{uuid.uuid4().hex[:6]}",
+            "profile_picture": None,
+            "status": "active",
+            "auth_type": "mock_testing",
+            "credentials": {
+                "access_token": f"mock_token_{uuid.uuid4().hex}",
+                "mock": True,
+                "note": "This is a test account - will not actually post to social media"
+            },
+            "connected_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
+            "account_info": {
+                "mock": True,
+                "test_mode": True
+            }
+        }
+
+        # Save to MongoDB
+        await db.social_accounts.update_one(
+            {"user_id": user_id, "account_id": account_id},
+            {"$set": mock_account},
+            upsert=True
+        )
+
+        # Also save to Zoho CRM if available (for testing the integration)
+        if zoho_crm:
+            try:
+                zoho_credential_record = {
+                    "Name": f"{user_id}_{platform}_{account_id}",
+                    "User_ID": user_id,
+                    "Platform": platform.title(),
+                    "Account_ID": account_id,
+                    "Account_Name": account_name,
+                    "Auth_Type": "mock_testing",
+                    "Status": "active",
+                    "Connected_At": datetime.now(timezone.utc).isoformat(),
+                    "Last_Updated": datetime.now(timezone.utc).isoformat(),
+                    "Notes": "Mock account for testing - not a real social media connection"
+                }
+
+                await zoho_crm.create_record(
+                    module_name="Social_Media_Credentials",
+                    record_data=zoho_credential_record,
+                    user_id=user_id
+                )
+                logger.info(f"Saved mock {platform} credentials to Zoho CRM: {account_id}")
+            except Exception as e:
+                logger.warning(f"Failed to save mock account to Zoho CRM: {str(e)}")
+
+        logger.info(f"✅ Created mock {platform} account for user {user_id}: {account_id}")
+
+        return {
+            "status": "success",
+            "message": f"Mock {platform} account created successfully",
+            "account": {
+                "account_id": account_id,
+                "account_name": account_name,
+                "platform": platform,
+                "user_id": user_id,
+                "auth_type": "mock_testing",
+                "note": "⚠️ This is a TEST account. It will not actually post to social media."
+            },
+            "warning": "This is a development endpoint. Use real OAuth in production."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating mock social account: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/social/check-config")
+async def check_social_media_config():
+    """
+    Check if social media OAuth credentials are properly configured.
+
+    Returns the configuration status for each platform.
+    """
+    try:
+        platforms_status = {}
+
+        # Check Facebook/Instagram
+        fb_app_id = os.getenv('FACEBOOK_APP_ID', '')
+        fb_app_secret = os.getenv('FACEBOOK_APP_SECRET', '')
+        fb_configured = bool(fb_app_id and fb_app_id.strip() and fb_app_secret and fb_app_secret.strip())
+
+        platforms_status['facebook'] = {
+            'configured': fb_configured,
+            'credentials': {
+                'app_id': 'set' if fb_app_id and fb_app_id.strip() else 'missing',
+                'app_secret': 'set' if fb_app_secret and fb_app_secret.strip() else 'missing'
+            }
+        }
+
+        platforms_status['instagram'] = {
+            'configured': fb_configured,
+            'note': 'Uses Facebook OAuth',
+            'credentials': {
+                'app_id': 'set' if fb_app_id and fb_app_id.strip() else 'missing',
+                'app_secret': 'set' if fb_app_secret and fb_app_secret.strip() else 'missing'
+            }
+        }
+
+        # Check Twitter
+        tw_api_key = os.getenv('TWITTER_API_KEY', '')
+        tw_api_secret = os.getenv('TWITTER_API_SECRET', '')
+        tw_bearer = os.getenv('TWITTER_BEARER_TOKEN', '')
+        tw_configured = bool(
+            tw_api_key and tw_api_key.strip() and
+            tw_api_secret and tw_api_secret.strip() and
+            tw_bearer and tw_bearer.strip()
+        )
+
+        platforms_status['twitter'] = {
+            'configured': tw_configured,
+            'credentials': {
+                'api_key': 'set' if tw_api_key and tw_api_key.strip() else 'missing',
+                'api_secret': 'set' if tw_api_secret and tw_api_secret.strip() else 'missing',
+                'bearer_token': 'set' if tw_bearer and tw_bearer.strip() else 'missing'
+            }
+        }
+
+        # Check LinkedIn
+        li_client_id = os.getenv('LINKEDIN_CLIENT_ID', '')
+        li_client_secret = os.getenv('LINKEDIN_CLIENT_SECRET', '')
+        li_configured = bool(li_client_id and li_client_id.strip() and li_client_secret and li_client_secret.strip())
+
+        platforms_status['linkedin'] = {
+            'configured': li_configured,
+            'credentials': {
+                'client_id': 'set' if li_client_id and li_client_id.strip() else 'missing',
+                'client_secret': 'set' if li_client_secret and li_client_secret.strip() else 'missing'
+            }
+        }
+
+        # Overall status
+        all_configured = all(p['configured'] for p in platforms_status.values())
+        any_configured = any(p['configured'] for p in platforms_status.values())
+
+        return {
+            "status": "success",
+            "overall": {
+                "all_platforms_configured": all_configured,
+                "any_platform_configured": any_configured,
+                "configured_count": sum(1 for p in platforms_status.values() if p['configured']),
+                "total_platforms": len(platforms_status)
+            },
+            "platforms": platforms_status,
+            "recommendations": {
+                "setup_guide": "See /SOCIAL_MEDIA_SETUP_GUIDE.md for OAuth app setup instructions",
+                "test_endpoint": "Use POST /api/social/connect/mock/{platform} for development/testing without OAuth",
+                "config_file": "Update backend/.env file with OAuth credentials"
+            } if not all_configured else {
+                "message": "All platforms configured! You can now connect social media accounts."
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking social media config: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ==================== Enhanced Social Media Posting ====================
